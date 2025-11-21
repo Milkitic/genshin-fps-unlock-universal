@@ -1,5 +1,9 @@
 # Genshin Impact FPS Unlocker
 
+注：本fork已长期停更，原因是作者（我）早已不玩原神，没有自用价值失去维护动力
+如果需要使用，请使用上游项目https://github.com/34736384/genshin-fps-unlock
+如果需要在linux上跑，相信愿意折腾的你也绝对会自己合并上游的内存地址相关的修改！
+
 A forked version which rewrites GUI and supports linux with WINE.
 
 ![image](https://github.com/Milkitic/genshin-fps-unlock-universal/assets/24785749/e92fe460-c045-46ef-bbf1-7f350e7eb179)
