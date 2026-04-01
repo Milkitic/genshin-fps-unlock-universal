@@ -1,4 +1,4 @@
-﻿using System.Runtime.InteropServices;
+using System.Runtime.InteropServices;
 using System.Text;
 
 namespace UnlockFps.Utils;
@@ -65,20 +65,77 @@ internal class ProcessUtils
 
     public static unsafe nint PatternScan(nint module, string signature)
     {
-        var dosHeader = Marshal.PtrToStructure<IMAGE_DOS_HEADER>(module);
-        var ntHeader = Marshal.PtrToStructure<IMAGE_NT_HEADERS>((nint)(module.ToInt64() + dosHeader.e_lfanew));
-
-        var sizeOfImage = ntHeader.OptionalHeader.SizeOfImage;
-
-        using var scanner = new Reloaded.Memory.Sigscan.Scanner((byte*)module.ToPointer(), (int)sizeOfImage);
-
-        var result = scanner.FindPattern(signature);
-        if (result.Found)
+        if (module == nint.Zero)
         {
-            return (nint)(module.ToInt64() + result.Offset);
+            return nint.Zero;
         }
 
-        return nint.Zero;
+        var (patternBytes, maskBytes) = ParseSignature(signature);
+
+        var sizeOfImage = Native.GetModuleImageSize(module);
+        var scanBytes = (byte*)module;
+        var restoreProtection = false;
+        uint oldProtection = 0;
+
+        // Wine can map modules loaded through LoadLibraryEx with protection flags
+        // that break direct span-based scanning, so temporarily relax protection and
+        // restore the original state immediately after the scan completes.
+        if (Native.IsWine())
+        {
+            restoreProtection = Native.VirtualProtect(module, sizeOfImage, MemoryProtection.EXECUTE_READWRITE, out oldProtection);
+        }
+
+        try
+        {
+            var span = new ReadOnlySpan<byte>(scanBytes, (int)sizeOfImage);
+            var offset = PatternScan(span, patternBytes, maskBytes);
+            return offset == -1 ? nint.Zero : module + (int)offset;
+        }
+        finally
+        {
+            if (restoreProtection)
+            {
+                Native.VirtualProtect(module, sizeOfImage, oldProtection, out _);
+            }
+        }
+    }
+
+    private static long PatternScan(ReadOnlySpan<byte> data, byte[] patternBytes, bool[] maskBytes)
+    {
+        var patternLength = patternBytes.Length;
+
+        for (var i = 0; i <= data.Length - patternLength; i++)
+        {
+            var found = true;
+            for (var j = 0; j < patternLength; j++)
+            {
+                if (!maskBytes[j] && patternBytes[j] != data[i + j])
+                {
+                    found = false;
+                    break;
+                }
+            }
+
+            if (found)
+            {
+                return i;
+            }
+        }
+
+        return -1;
+    }
+
+    private static (byte[] PatternBytes, bool[] MaskBytes) ParseSignature(string signature)
+    {
+        var tokens = signature.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        var patternBytes = tokens
+            .Select(x => x is "?" or "??" ? (byte)0xFF : Convert.ToByte(x, 16))
+            .ToArray();
+        var maskBytes = tokens
+            .Select(x => x is "?" or "??")
+            .ToArray();
+
+        return (patternBytes, maskBytes);
     }
 
     public static nint GetModuleBase(nint hProcess, string moduleName)

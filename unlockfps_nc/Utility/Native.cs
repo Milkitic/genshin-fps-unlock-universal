@@ -90,6 +90,9 @@ namespace unlockfps_nc.Utility
         [DllImport("psapi.dll", SetLastError = true)]
         public static extern bool EnumProcessModules(IntPtr hProcess, [Out] IntPtr[] lphModule, uint cb, out uint lpcbNeeded);
 
+        [DllImport("psapi.dll", SetLastError = true)]
+        public static extern bool EnumProcessModulesEx(IntPtr hProcess, [Out] IntPtr[] lphModule, uint cb, out uint lpcbNeeded, uint dwFilterFlag);
+
         [DllImport("psapi.dll", CharSet = CharSet.Unicode, SetLastError = true)]
         public static extern uint GetModuleBaseName(IntPtr hProcess, IntPtr hModule, StringBuilder lpBaseName, uint nSize);
 
@@ -177,6 +180,11 @@ namespace unlockfps_nc.Utility
         public const uint READONLY = 0x02;
         public const uint READWRITE = 0x04;
         public const uint WRITECOPY = 0x08;
+    }
+
+    internal static class ModuleFilter
+    {
+        public const uint LIST_MODULES_64BIT = 0x02;
     }
 
     [StructLayout(LayoutKind.Sequential)]

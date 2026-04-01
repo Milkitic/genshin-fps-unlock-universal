@@ -67,6 +67,9 @@ internal class Native
     public static extern bool VirtualFreeEx(IntPtr hProcess, IntPtr lpAddress, uint dwSize, uint dwFreeType);
 
     [DllImport("kernel32.dll", SetLastError = true)]
+    public static extern bool VirtualProtect(IntPtr lpAddress, uint dwSize, uint flNewProtect, out uint lpflOldProtect);
+
+    [DllImport("kernel32.dll", SetLastError = true)]
     public static extern uint WaitForSingleObject(IntPtr hHandle, uint dwMilliseconds);
 
     [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
@@ -82,6 +85,9 @@ internal class Native
     public static extern IntPtr GetProcAddress(IntPtr hModule, string procedureName);
 
     [DllImport("kernel32.dll")]
+    public static extern IntPtr GetModuleHandle(string lpModuleName);
+
+    [DllImport("kernel32.dll")]
     public static extern bool SetPriorityClass(IntPtr hProcess, uint dwPriorityClass);
 
     [DllImport("psapi.dll", SetLastError = true)]
@@ -95,6 +101,20 @@ internal class Native
 
     [DllImport("ntdll.dll")]
     public static extern uint RtlAdjustPrivilege(uint Privilege, bool bEnablePrivilege, bool IsThreadPrivilege, out bool PreviousValue);
+
+    public static bool IsWine()
+    {
+        var ntdll = GetModuleHandle("ntdll.dll");
+        var ver = GetProcAddress(ntdll, "wine_get_version");
+        return ver != IntPtr.Zero;
+    }
+
+    public static uint GetModuleImageSize(IntPtr lpBaseAddress)
+    {
+        var dosHeader = Marshal.PtrToStructure<IMAGE_DOS_HEADER>(lpBaseAddress);
+        var ntHeader = Marshal.PtrToStructure<IMAGE_NT_HEADERS>(lpBaseAddress + dosHeader.e_lfanew);
+        return ntHeader.OptionalHeader.SizeOfImage;
+    }
 }
 
 internal class ModuleGuard(IntPtr module) : IDisposable

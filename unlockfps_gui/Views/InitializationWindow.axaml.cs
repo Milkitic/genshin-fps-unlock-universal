@@ -285,8 +285,15 @@ namespace UnlockFps.Gui.Views
             }
 
             var directory = Path.GetDirectoryName(selectedPath);
-            var unityPlayer = Path.Combine(directory, "UnityPlayer.dll");
-            if (!File.Exists(unityPlayer))
+            if (string.IsNullOrEmpty(directory))
+            {
+                var alertWindow = App.DefaultServices.GetRequiredService<AlertWindow>();
+                alertWindow.Text = "That's not the right place";
+                await alertWindow.ShowDialog(this);
+                return;
+            }
+
+            if (!Directory.Exists(Path.Combine(directory, $"{fileName}_Data")))
             {
                 var alertWindow = App.DefaultServices.GetRequiredService<AlertWindow>();
                 alertWindow.Text = "That's not the right place";
