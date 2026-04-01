@@ -177,8 +177,13 @@ namespace unlockfps_nc
                 return;
             }
 
-            var unityPlayer = Path.Combine(directory, "UnityPlayer.dll");
-            if (!File.Exists(unityPlayer))
+            if (string.IsNullOrEmpty(directory))
+            {
+                MessageBox.Show(@"That's not the right place", @"Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return;
+            }
+
+            if (!Directory.Exists(Path.Combine(directory, $"{fileName}_Data")))
             {
                 MessageBox.Show(@"That's not the right place", @"Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 return;

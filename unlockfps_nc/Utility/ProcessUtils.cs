@@ -10,6 +10,8 @@ namespace unlockfps_nc.Utility
 {
     internal class ProcessUtils
     {
+        private const int ErrorPartialCopy = 299;
+
         public static string GetProcessPathFromPid(uint pid, out IntPtr processHandle)
         {
             var hProcess = Native.OpenProcess(
@@ -106,11 +108,16 @@ namespace unlockfps_nc.Utility
 
         public static IntPtr GetModuleBase(IntPtr hProcess, string moduleName)
         {
+            if (string.IsNullOrEmpty(moduleName))
+                return IntPtr.Zero;
+
+            var moduleNameLower = moduleName.ToLowerInvariant();
             var modules = new IntPtr[1024];
 
-            if (!Native.EnumProcessModules(hProcess, modules, (uint)(modules.Length * IntPtr.Size), out var bytesNeeded))
+            if (!Native.EnumProcessModulesEx(hProcess, modules, (uint)(modules.Length * IntPtr.Size), out var bytesNeeded, ModuleFilter.LIST_MODULES_64BIT))
             {
-                if (Marshal.GetLastWin32Error() != 299)
+                var errorCode = Marshal.GetLastWin32Error();
+                if (errorCode != ErrorPartialCopy)
                     return IntPtr.Zero;
             }
 
@@ -120,7 +127,7 @@ namespace unlockfps_nc.Utility
                 if (Native.GetModuleBaseName(hProcess, module, sb, (uint)sb.Capacity) == 0)
                     continue;
 
-                if (sb.ToString() != moduleName)
+                if (sb.ToString().ToLowerInvariant() != moduleNameLower)
                     continue;
 
                 if (!Native.GetModuleInformation(hProcess, module, out var moduleInfo, (uint)Marshal.SizeOf<MODULEINFO>()))
