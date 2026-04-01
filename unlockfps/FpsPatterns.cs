@@ -29,6 +29,8 @@ internal static class FpsPatterns
         var timeDateStamp = ntHeader.FileHeader.TimeDateStamp;
         Logger.LogDebug($"TimeDateStamp: {timeDateStamp}");
 
+        // Prefer the pattern family that matches the UnityPlayer timestamp, then
+        // fall back to the other known upstream-compatible path before giving up.
         if (timeDateStamp >= Unity43TimeDateStamp && TryGet43PlusAddress(pUnityPlayer, pUserAssembly, mdUnityPlayer, mdUserAssembly, process, out var address))
         {
             return address;
@@ -117,6 +119,8 @@ internal static class FpsPatterns
         byte* remoteVa = rip - pUserAssembly.ToInt64() + mdUserAssembly.BaseAddress.ToInt64();
         byte* dataPtr = null;
 
+        // userAssembly may publish the pointer a little later than the scan hits,
+        // so poll the remote slot for a short bounded window instead of spinning forever.
         Span<byte> readResult = stackalloc byte[8];
         for (var retryCount = 0; retryCount < PointerReadRetryCount && dataPtr == null; retryCount++)
         {

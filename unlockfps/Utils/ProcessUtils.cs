@@ -77,6 +77,9 @@ internal class ProcessUtils
         var restoreProtection = false;
         uint oldProtection = 0;
 
+        // Wine can map modules loaded through LoadLibraryEx with protection flags
+        // that break direct span-based scanning, so temporarily relax protection and
+        // restore the original state immediately after the scan completes.
         if (Native.IsWine())
         {
             restoreProtection = Native.VirtualProtect(module, sizeOfImage, MemoryProtection.EXECUTE_READWRITE, out oldProtection);
