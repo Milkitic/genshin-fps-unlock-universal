@@ -32,6 +32,5 @@
     <PackageReference Include="PublishAotCompressed" Version="1.0.3" >
       <PrivateAssets>all</PrivateAssets>
     </PackageReference>
-    <PackageReference Include="Reloaded.Memory.Sigscan" Version="3.1.8" />
   </ItemGroup>
 </Project>
