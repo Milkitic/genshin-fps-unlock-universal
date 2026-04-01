@@ -9,6 +9,7 @@ internal static class FpsPatterns
 {
     private static readonly ILogger Logger = LogManager.GetLogger(nameof(FpsPatterns));
     private const uint Unity43TimeDateStamp = 0x656FFAF7U;
+    private const int PointerReadRetryCount = 50;
 
     public static unsafe nint ProvideAddress(ProcessModule mdUnityPlayer, ProcessModule mdUserAssembly, Process process)
     {
@@ -38,7 +39,8 @@ internal static class FpsPatterns
             return address;
         }
 
-        if (TryGet43PlusAddress(pUnityPlayer, pUserAssembly, mdUnityPlayer, mdUserAssembly, process, out address))
+        if (timeDateStamp < Unity43TimeDateStamp
+            && TryGet43PlusAddress(pUnityPlayer, pUserAssembly, mdUnityPlayer, mdUserAssembly, process, out address))
         {
             return address;
         }
@@ -116,11 +118,29 @@ internal static class FpsPatterns
         byte* dataPtr = null;
 
         Span<byte> readResult = stackalloc byte[8];
-        while (dataPtr == null)
+        for (var retryCount = 0; retryCount < PointerReadRetryCount && dataPtr == null; retryCount++)
         {
-            Utils.NativeMethods.ReadProcessMemory(process.Handle, (nint)remoteVa, readResult, readResult.Length, out _);
+            if (!Utils.NativeMethods.ReadProcessMemory(process.Handle, (nint)remoteVa, readResult, readResult.Length, out var readBytes)
+                || readBytes != readResult.Length)
+            {
+                Logger.LogWarning($"Failed to read FPS pointer from remote address 0x{(nint)remoteVa:X16}.");
+                address = nint.Zero;
+                return false;
+            }
+
             ulong value = BitConverter.ToUInt64(readResult);
             dataPtr = (byte*)value;
+            if (dataPtr == null)
+            {
+                Thread.Sleep(100);
+            }
+        }
+
+        if (dataPtr == null)
+        {
+            Logger.LogWarning($"Timed out while waiting for FPS pointer at remote address 0x{(nint)remoteVa:X16}.");
+            address = nint.Zero;
+            return false;
         }
 
         byte* localVa = dataPtr - mdUnityPlayer.BaseAddress.ToInt64() + pUnityPlayer.ToInt64();

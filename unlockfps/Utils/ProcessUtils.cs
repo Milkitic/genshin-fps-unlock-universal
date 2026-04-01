@@ -65,19 +65,36 @@ internal class ProcessUtils
 
     public static unsafe nint PatternScan(nint module, string signature)
     {
+        if (module == nint.Zero)
+        {
+            return nint.Zero;
+        }
+
         var (patternBytes, maskBytes) = ParseSignature(signature);
 
         var sizeOfImage = Native.GetModuleImageSize(module);
         var scanBytes = (byte*)module;
+        var restoreProtection = false;
+        uint oldProtection = 0;
 
         if (Native.IsWine())
         {
-            Native.VirtualProtect(module, sizeOfImage, MemoryProtection.EXECUTE_READWRITE, out _);
+            restoreProtection = Native.VirtualProtect(module, sizeOfImage, MemoryProtection.EXECUTE_READWRITE, out oldProtection);
         }
 
-        var span = new ReadOnlySpan<byte>(scanBytes, (int)sizeOfImage);
-        var offset = PatternScan(span, patternBytes, maskBytes);
-        return offset == -1 ? nint.Zero : module + (int)offset;
+        try
+        {
+            var span = new ReadOnlySpan<byte>(scanBytes, (int)sizeOfImage);
+            var offset = PatternScan(span, patternBytes, maskBytes);
+            return offset == -1 ? nint.Zero : module + (int)offset;
+        }
+        finally
+        {
+            if (restoreProtection)
+            {
+                Native.VirtualProtect(module, sizeOfImage, oldProtection, out _);
+            }
+        }
     }
 
     private static long PatternScan(ReadOnlySpan<byte> data, byte[] patternBytes, bool[] maskBytes)
