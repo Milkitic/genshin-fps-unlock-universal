@@ -21,7 +21,7 @@ A forked version which rewrites GUI and supports linux with WINE.
  - Free code signing provided by [SignPath.io](https://signpath.io/)
 
  ## Compiling
- 1. Install Visual Studio 2022 with Desktop C++ workload in Visual Studio Installer.
+ 1. Install Visual Studio 2026 with Desktop C++ workload in Visual Studio Installer.
  2. Install .NET 8 SDK.
  3. Use `dotnet build ./unlockfps_gui` for regular compiling. Use `dotnet publish ./unlockfps_gui -c Release -r win-x64` for AOT publish.
 
