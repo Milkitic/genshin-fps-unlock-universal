@@ -11,8 +11,8 @@ using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Interactivity;
 using Avalonia.Threading;
+using CommunityToolkit.Mvvm.Input;
 using Microsoft.Extensions.DependencyInjection;
-using ReactiveUI;
 using UnlockFps.Gui.Utils;
 using UnlockFps.Gui.ViewModels;
 using UnlockFps.Gui.Views;
@@ -29,11 +29,10 @@ namespace UnlockFps.Gui.ViewModels
         public int MinimumFps { get; set; } = 1;
         public int MaximumFps { get; set; } = 420;
 
-        public ICommand OpenInitializationWindowCommand { get; } =
-            ReactiveCommand.CreateFromTask(ShowWindow<InitializationWindow>);
+        public ICommand OpenInitializationWindowCommand { get; } = new AsyncRelayCommand(ShowWindow<InitializationWindow>);
 
-        public ICommand OpenSettingsWindowCommand { get; } = ReactiveCommand.CreateFromTask(ShowWindow<SettingsWindow>);
-        public ICommand OpenAboutWindowCommand { get; } = ReactiveCommand.CreateFromTask(ShowWindow<AboutWindow>);
+        public ICommand OpenSettingsWindowCommand { get; } = new AsyncRelayCommand(ShowWindow<SettingsWindow>);
+        public ICommand OpenAboutWindowCommand { get; } = new AsyncRelayCommand(ShowWindow<AboutWindow>);
 
         public static async Task ShowWindow<T>() where T : Window
         {

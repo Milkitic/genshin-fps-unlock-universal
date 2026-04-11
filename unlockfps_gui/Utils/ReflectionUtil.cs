@@ -55,7 +55,7 @@ internal static class ReflectionUtil
 
     private static void FixCommit(ref string version)
     {
-        if (!SemVersion.TryParse(version, SemVersionStyles.Strict, out var semVer)) return;
+        if (!SemVersion.TryParse(version, SemVersionStyles.Any, out var semVer)) return;
 
         if (!semVer.IsPrerelease)
         {

@@ -5,8 +5,8 @@ using System.Windows.Input;
 using Avalonia.Controls;
 using Avalonia.Interactivity;
 using Avalonia.Platform.Storage;
+using CommunityToolkit.Mvvm.Input;
 using Microsoft.Extensions.DependencyInjection;
-using ReactiveUI;
 using UnlockFps.Gui.ViewModels;
 using UnlockFps.Gui.Views;
 using UnlockFps.Services;
@@ -23,7 +23,7 @@ namespace UnlockFps.Gui.ViewModels
 
         public string? SelectedDll { get; set; }
 
-        public ICommand AddDllCommand => _addDllCommand ??= ReactiveCommand.CreateFromTask(async () =>
+        public ICommand AddDllCommand => _addDllCommand ??= new AsyncRelayCommand(async () =>
         {
             var selectedFiles = await Window.StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
             {
@@ -57,7 +57,7 @@ namespace UnlockFps.Gui.ViewModels
             }
         });
 
-        public ICommand RemoveDllCommand => _removeDllCommand ??= ReactiveCommand.Create(() =>
+        public ICommand RemoveDllCommand => _removeDllCommand ??= new RelayCommand(() =>
         {
             if (SelectedDll != null)
             {

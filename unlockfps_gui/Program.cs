@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Threading;
 using Avalonia;
-using Avalonia.ReactiveUI;
 using UnlockFps.Gui.Utils;
 
 namespace UnlockFps.Gui;
@@ -30,8 +29,7 @@ internal sealed class Program
         var appBuilder = AppBuilder.Configure<App>()
             .UsePlatformDetect()
             .WithNativeFonts()
-            .LogToTrace()
-            .UseReactiveUI();
+            .LogToTrace();
         if (WineHelper.DetectWine(out _, out _))
         {
             return appBuilder
