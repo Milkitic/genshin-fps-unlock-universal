@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Reflection.PortableExecutable;
 using System.Runtime.InteropServices;
@@ -10,15 +11,8 @@ namespace unlockfps_nc.Utility
 {
     internal class ProcessUtils
     {
-        public static string GetProcessPathFromPid(uint pid, out IntPtr processHandle)
+        public static string GetProcessPath(IntPtr hProcess)
         {
-            var hProcess = Native.OpenProcess(
-                ProcessAccess.QUERY_LIMITED_INFORMATION |
-                ProcessAccess.TERMINATE |
-                StandardAccess.SYNCHRONIZE, false, pid);
-
-            processHandle = hProcess;
-
             if (hProcess == IntPtr.Zero)
                 return string.Empty;
 
@@ -30,8 +24,28 @@ namespace unlockfps_nc.Utility
             return sb.ToString();
         }
 
+        public static IntPtr GetWindowFromProcessId(int processId)
+        {
+            IntPtr windowHandle = IntPtr.Zero;
+
+            Native.EnumWindows((hWnd, lParam) =>
+            {
+                Native.GetWindowThreadProcessId(hWnd, out uint pid);
+                if (pid == processId)
+                {
+                    windowHandle = hWnd;
+                    return false;
+                }
+
+                return true;
+            }, IntPtr.Zero);
+
+            return windowHandle;
+        }
+
         public static bool InjectDlls(IntPtr processHandle, List<string> dllPaths)
         {
+#if !RELEASEMIN
             if (dllPaths.Count == 0)
                 return true;
 
@@ -64,33 +78,79 @@ namespace unlockfps_nc.Utility
             }
 
             Native.VirtualFreeEx(processHandle, remoteVa, 0, FreeType.RELEASE);
-
+#endif
             return true;
         }
 
         public static unsafe IntPtr PatternScan(IntPtr module, string signature)
         {
-            var tokens = signature.Split(' ');
-            var patternBytes = tokens
-                .ToList()
-                .Select(x => x == "?" ? (byte)0xFF : Convert.ToByte(x, 16))
-                .ToArray();
+            var (patternBytes, maskBytes) = ParseSignature(signature);
 
-            var dosHeader = Marshal.PtrToStructure<IMAGE_DOS_HEADER>(module);
-            var ntHeader = Marshal.PtrToStructure<IMAGE_NT_HEADERS>((IntPtr)(module.ToInt64() + dosHeader.e_lfanew));
-
-            var sizeOfImage = ntHeader.OptionalHeader.SizeOfImage;
+            var sizeOfImage = Native.GetModuleImageSize(module);
             var scanBytes = (byte*)module;
 
+            if (Native.IsWine())
+            {
+                /*
+                 *  Fixes a problem with LoadLibraryEx not working properly on Wine.
+                 *  When the flag 'LOAD_LIBRARY_AS_IMAGE_RESOURCE' is used, it is supposed to map the entire file as READONLY.
+                 *  But Wine maps each section with the respective protection, and if there is a section with no read permission, it will trigger Access Violation.
+                */
+                Native.VirtualProtect(module, sizeOfImage, MemoryProtection.EXECUTE_READWRITE, out _);
+            }
+
+            var span = new ReadOnlySpan<byte>(scanBytes, (int)sizeOfImage);
+            var offset = PatternScan(span, patternBytes, maskBytes);
+
+            if (offset != -1)
+                return (IntPtr)(module.ToInt64() + offset);
+
+
+            return IntPtr.Zero;
+        }
+
+        public static unsafe List<IntPtr> PatternScanAllOccurrences(IntPtr module, string signature)
+        {
+            var (patternBytes, maskBytes) = ParseSignature(signature);
+
+            var sizeOfImage = Native.GetModuleImageSize(module);
+            var scanBytes = (byte*)module;
+
+            if (Native.IsWine())
+                Native.VirtualProtect(module, sizeOfImage, MemoryProtection.EXECUTE_READWRITE, out _);
+            
+            var span = new ReadOnlySpan<byte>(scanBytes, (int)sizeOfImage);
+            var offsets = new List<IntPtr>();
+
+            var totalProcessed = 0L;
+            while (true)
+            {
+                var offset = PatternScan(span, patternBytes, maskBytes);
+                if (offset == -1)
+                    break;
+
+                offsets.Add((IntPtr)(module.ToInt64() + offset + totalProcessed));
+
+                var processedOffset = offset + patternBytes.Length;
+                totalProcessed += processedOffset;
+
+                span = span.Slice((int)processedOffset);
+            }
+
+            return offsets;
+        }
+
+        public static long PatternScan(ReadOnlySpan<byte> data, byte[] patternBytes, bool[] maskBytes)
+        {
             var s = patternBytes.Length;
             var d = patternBytes;
 
-            for (var i = 0U; i < sizeOfImage - s; i++)
+            for (var i = 0; i < data.Length - s; i++)
             {
                 var found = true;
                 for (var j = 0; j < s; j++)
                 {
-                    if (d[j] != scanBytes[i + j] && d[j] != 0xFF)
+                    if (d[j] != data[i + j] && !maskBytes[j])
                     {
                         found = false;
                         break;
@@ -98,20 +158,39 @@ namespace unlockfps_nc.Utility
                 }
 
                 if (found)
-                    return (IntPtr)(module.ToInt64() + i);
+                    return i;
             }
 
-            return IntPtr.Zero;
+            return -1;
+        }
+
+        private static (byte[], bool[]) ParseSignature(string signature)
+        {
+            var tokens = signature.Split(' ');
+            var patternBytes = tokens
+                .Select(x => x == "?" ? (byte)0xFF : Convert.ToByte(x, 16))
+                .ToArray();
+            var maskBytes = tokens
+                .Select(x => x == "?")
+                .ToArray();
+
+            return (patternBytes, maskBytes);
         }
 
         public static IntPtr GetModuleBase(IntPtr hProcess, string moduleName)
         {
+            var moduleNameLower = moduleName.ToLowerInvariant();
             var modules = new IntPtr[1024];
 
-            if (!Native.EnumProcessModules(hProcess, modules, (uint)(modules.Length * IntPtr.Size), out var bytesNeeded))
+            if (!Native.EnumProcessModulesEx(hProcess, modules, (uint)(modules.Length * IntPtr.Size), out var bytesNeeded, 2))
             {
-                if (Marshal.GetLastWin32Error() != 299)
+                var errorCode = Marshal.GetLastWin32Error();
+                if (errorCode != 299)
+                {
+                    MessageBox.Show($@"EnumProcessModulesEx failed ({errorCode}){Environment.NewLine}{Marshal.GetLastPInvokeErrorMessage()}"
+                        , @"Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
                     return IntPtr.Zero;
+                }
             }
 
             foreach (var module in modules.Where(x => x != IntPtr.Zero))
@@ -120,7 +199,7 @@ namespace unlockfps_nc.Utility
                 if (Native.GetModuleBaseName(hProcess, module, sb, (uint)sb.Capacity) == 0)
                     continue;
 
-                if (sb.ToString() != moduleName)
+                if (sb.ToString().ToLowerInvariant() != moduleNameLower)
                     continue;
 
                 if (!Native.GetModuleInformation(hProcess, module, out var moduleInfo, (uint)Marshal.SizeOf<MODULEINFO>()))
@@ -130,6 +209,22 @@ namespace unlockfps_nc.Utility
             }
 
             return IntPtr.Zero;
+        }
+
+        public static bool IsWindowDrawing(IntPtr hWnd)
+        {
+            if (!Native.IsWindowVisible(hWnd))
+                return false;
+
+            Native.RedrawWindow(hWnd, IntPtr.Zero, IntPtr.Zero, 0x122); // RDW_INTERNALPAINT | RDW_NOERASE | RDW_UPDATENOW
+            Native.UpdateWindow(hWnd);
+
+            var hdc = Native.GetDC(hWnd);
+            if (hdc == IntPtr.Zero)
+                return false;
+
+            Native.ReleaseDC(hWnd, hdc);
+            return true;
         }
 
     }

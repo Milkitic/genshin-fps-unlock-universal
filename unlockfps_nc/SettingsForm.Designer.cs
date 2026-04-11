@@ -58,6 +58,7 @@
             label1 = new Label();
             ToolTipSettings = new ToolTip(components);
             DllAddDialog = new OpenFileDialog();
+            CBHdr = new CheckBox();
             TabCtrlSettings.SuspendLayout();
             TabGeneral.SuspendLayout();
             TabLaunchOptions.SuspendLayout();
@@ -90,6 +91,7 @@
             // 
             // TabGeneral
             // 
+            TabGeneral.Controls.Add(CBHdr);
             TabGeneral.Controls.Add(ComboPriority);
             TabGeneral.Controls.Add(LabelPriority);
             TabGeneral.Controls.Add(CBPowerSave);
@@ -107,7 +109,7 @@
             // 
             ComboPriority.FormattingEnabled = true;
             ComboPriority.Items.AddRange(new object[] { "Realtime", "High", "Above Normal", "Normal", "Below Normal", "Low" });
-            ComboPriority.Location = new Point(125, 82);
+            ComboPriority.Location = new Point(125, 102);
             ComboPriority.Name = "ComboPriority";
             ComboPriority.Size = new Size(121, 23);
             ComboPriority.TabIndex = 5;
@@ -116,7 +118,7 @@
             // LabelPriority
             // 
             LabelPriority.AutoSize = true;
-            LabelPriority.Location = new Point(3, 85);
+            LabelPriority.Location = new Point(3, 105);
             LabelPriority.Name = "LabelPriority";
             LabelPriority.Size = new Size(122, 15);
             LabelPriority.TabIndex = 4;
@@ -130,7 +132,7 @@
             CBPowerSave.Size = new Size(97, 19);
             CBPowerSave.TabIndex = 3;
             CBPowerSave.Text = "Power Saving";
-            ToolTipSettings.SetToolTip(CBPowerSave, "Sets fps to 10 and low process priority upon losing focus (e.g. tabbing out of game)");
+            ToolTipSettings.SetToolTip(CBPowerSave, "Sets fps to 10 upon losing focus (e.g. tabbing out of game)");
             CBPowerSave.UseVisualStyleBackColor = true;
             // 
             // CBAutoClose
@@ -152,7 +154,7 @@
             CBStartMinimized.Size = new Size(167, 19);
             CBStartMinimized.TabIndex = 1;
             CBStartMinimized.Text = "Start Minimized (Unlocker)";
-            ToolTipSettings.SetToolTip(CBStartMinimized, "Unlocker will minimized to tray on starup");
+            ToolTipSettings.SetToolTip(CBStartMinimized, "Unlocker will minimized to tray on startup");
             CBStartMinimized.UseVisualStyleBackColor = true;
             // 
             // TabLaunchOptions
@@ -373,6 +375,16 @@
             DllAddDialog.Multiselect = true;
             DllAddDialog.RestoreDirectory = true;
             // 
+            // CBHdr
+            // 
+            CBHdr.AutoSize = true;
+            CBHdr.Location = new Point(6, 81);
+            CBHdr.Name = "CBHdr";
+            CBHdr.Size = new Size(88, 19);
+            CBHdr.TabIndex = 6;
+            CBHdr.Text = "Enable HDR";
+            CBHdr.UseVisualStyleBackColor = true;
+            // 
             // SettingsForm
             // 
             AutoScaleDimensions = new SizeF(7F, 15F);
@@ -433,5 +445,6 @@
         private CheckBox CBSuspendLoad;
         private CheckBox CBUseMobileUI;
         private OpenFileDialog DllAddDialog;
+        private CheckBox CBHdr;
     }
 }

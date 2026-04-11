@@ -1,0 +1,24 @@
+version: 1.0.{build}
+branches:
+  only:
+  - netcore
+skip_tags: true
+skip_branch_with_pr: true
+image: Visual Studio 2022
+clone_folder: C:\projects\genshin-fps-unlock
+install:
+- ps: dotnet restore
+build_script:
+- ps: >-
+    msbuild UnlockerStub\UnlockerStub.vcxproj /p:Configuration=Release /p:Platform=x64
+
+    Copy-Item -Path "C:\projects\genshin-fps-unlock\UnlockerStub\unlockfps_nc\Resources\UnlockerStub.dll" -Destination "C:\projects\genshin-fps-unlock\unlockfps_nc\Resources\UnlockerStub.dll" -Force
+
+    dotnet publish unlockfps_nc\unlockfps_nc.csproj -c ReleaseMin -r win-x64 -f net8.0-windows --self-contained false -p:PublishSingleFile=true -p:PublishReadyToRun=false
+artifacts:
+- path: unlockfps_nc\bin\ReleaseMin\net8.0-windows\win-x64\publish\**\*.exe
+deploy:
+- provider: Webhook
+  url: https://app.signpath.io/API/v1/9aaa881d-b8d0-4e48-800c-53215f1c8198/Integrations/AppVeyor?ProjectSlug=genshin-fps-unlock&SigningPolicySlug=release-signing
+  authorization:
+    secure: LJqK7hw1sX5isXvSGUCegEbtwm39QW2Nf2NCPOFhJBDNluQT0968km8XT/3dHgzcxGuzTq8ZxF0WoubcT7u9vg==

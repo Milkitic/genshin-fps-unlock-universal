@@ -44,6 +44,7 @@
             NotifyIconMain = new NotifyIcon(components);
             ContextNotify = new ContextMenuStrip(components);
             ExitMenuItem = new ToolStripMenuItem();
+            StartGameMenuItem = new ToolStripMenuItem();
             OptionsMenuStrip.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)InputFPS).BeginInit();
             ((System.ComponentModel.ISupportInitialize)SliderFPS).BeginInit();
@@ -99,7 +100,7 @@
             // InputFPS
             // 
             InputFPS.Location = new Point(47, 31);
-            InputFPS.Maximum = new decimal(new int[] { 420, 0, 0, 0 });
+            InputFPS.Maximum = new decimal(new int[] { 1000, 0, 0, 0 });
             InputFPS.Minimum = new decimal(new int[] { 1, 0, 0, 0 });
             InputFPS.Name = "InputFPS";
             InputFPS.Size = new Size(225, 23);
@@ -109,7 +110,7 @@
             // SliderFPS
             // 
             SliderFPS.Location = new Point(12, 60);
-            SliderFPS.Maximum = 420;
+            SliderFPS.Maximum = 1000;
             SliderFPS.Minimum = 1;
             SliderFPS.Name = "SliderFPS";
             SliderFPS.Size = new Size(260, 45);
@@ -142,7 +143,7 @@
             // 
             NotifyIconMain.BalloonTipIcon = ToolTipIcon.Info;
             NotifyIconMain.BalloonTipText = "Minimized to tray";
-            NotifyIconMain.BalloonTipTitle = "FPS Unlcoker";
+            NotifyIconMain.BalloonTipTitle = "FPS Unlocker";
             NotifyIconMain.ContextMenuStrip = ContextNotify;
             NotifyIconMain.Icon = (Icon)resources.GetObject("NotifyIconMain.Icon");
             NotifyIconMain.Text = "FPS Unlocker";
@@ -151,16 +152,23 @@
             // 
             // ContextNotify
             // 
-            ContextNotify.Items.AddRange(new ToolStripItem[] { ExitMenuItem });
+            ContextNotify.Items.AddRange(new ToolStripItem[] { StartGameMenuItem, ExitMenuItem });
             ContextNotify.Name = "ContextNotify";
-            ContextNotify.Size = new Size(94, 26);
+            ContextNotify.Size = new Size(181, 70);
             // 
             // ExitMenuItem
             // 
             ExitMenuItem.Name = "ExitMenuItem";
-            ExitMenuItem.Size = new Size(93, 22);
+            ExitMenuItem.Size = new Size(180, 22);
             ExitMenuItem.Text = "Exit";
             ExitMenuItem.Click += ExitMenuItem_Click;
+            // 
+            // StartGameMenuItem
+            // 
+            StartGameMenuItem.Name = "StartGameMenuItem";
+            StartGameMenuItem.Size = new Size(180, 22);
+            StartGameMenuItem.Text = "Start Game";
+            StartGameMenuItem.Click += StartGameMenuItem_Click;
             // 
             // MainForm
             // 
@@ -209,5 +217,6 @@
         private ContextMenuStrip ContextNotify;
         private ToolStripMenuItem exitToolStripMenuItem;
         private ToolStripMenuItem ExitMenuItem;
+        private ToolStripMenuItem StartGameMenuItem;
     }
 }

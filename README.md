@@ -18,11 +18,15 @@ A forked version which rewrites GUI and supports linux with WINE.
  - Should work for future updates
  - If the source needs to be updated, I'll try to do it as soon as possible
  - You can download the compiled binary over at '[Release](https://github.com/34736384/genshin-fps-unlock/releases)' if you don't want to compile it yourself
+ - Free code signing provided by [SignPath.io](https://signpath.io/)
 
  ## Compiling
  1. Install Visual Studio 2022 with Desktop C++ workload in Visual Studio Installer.
  2. Install .NET 8 SDK.
  3. Use `dotnet build ./unlockfps_gui` for regular compiling. Use `dotnet publish ./unlockfps_gui -c Release -r win-x64` for AOT publish.
+
+ ### Cross Compiling on GNU/Linux
+ You need [dotnet-8 SDK for Linux](https://dotnet.microsoft.com/en-us/download/dotnet) for .NET apps and x86_64-w64-mingw32 tool-chain for compiling the UnlockerStub to dll. Take Debian as an example, `apt install mingw-w64` installs the MinGW tool-chain. Finally, use `make` to build.
 
  ## Usage
  
@@ -58,4 +62,31 @@ A forked version which rewrites GUI and supports linux with WINE.
  - HoYoverse (miHoYo) is well aware of this tool, and you will not get banned for using **ONLY** fps unlock.
  - If you are using other third-party plugins, you are doing it at your own risk.
  - Any artifacts from unlocking fps (e.g. stuttering) is **NOT** a bug of the unlocker
+
+# 原神解锁FPS限制
+
+ - 工作原理类似于外部辅助，通过**WriteProcessMemory**把FPS数值写进游戏
+ - 不需要通过驱动进行读写操作
+ - 支持国服和外服
+ - 理论上支持后续版本，不需要更新源码
+ - 如果需要更新我会尽快更新
+
+## 编译
+ - 用VS2022编译
+
+### GNU/Linux 上交叉编译
+见 [Cross Compiling on GNU/Linux](#cross-compiling-on-gnulinux)
+
+## 食用指南
+ - 运行前确保系统已安装[.NET Desktop Runtime 8.0.0](https://dotnet.microsoft.com/en-us/download/dotnet/thank-you/runtime-desktop-8.0.0-windows-x64-installer) (一般来说系统自带就有)
+ - 第一次运行的话先以管理员运行，解锁器会尝试通过注册表寻找游戏路经，如果找不到的话会提示你浏览游戏位置或者开启游戏
+ - 解锁器放哪都行
+ - 运行之前确保游戏是关闭的
+ - 用管理员运行解锁器
+ - 解锁器不能关掉
+>使用管理员运行是因为游戏必须由解锁器启动，游戏本身就需要管理员权限了，所以负责启动的也是需要的
+
+## 3.0.0 版本更新
+ - 用.NET 8重写了项目
+ - 添加了一个启动项，可以以移动端UI启动
 
