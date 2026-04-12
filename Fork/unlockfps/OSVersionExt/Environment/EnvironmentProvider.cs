@@ -1,7 +1,4 @@
-﻿using OSVersionExt.Environment;
-
-
-namespace OSVersionExt
+﻿namespace UnlockFps.OSVersionExt.Environment
 {
     public class EnvironmentProvider : IEnvironment
     {

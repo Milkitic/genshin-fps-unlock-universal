@@ -1,15 +1,13 @@
-using System;
-using System.Threading.Tasks;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
 using Microsoft.Extensions.DependencyInjection;
-using UnlockFps.Gui.Utils;
-using UnlockFps.Gui.Views;
 using UnlockFps.Services;
+using UnlockFps.Utils;
+using UnlockFps.Views;
 
-namespace UnlockFps.Gui;
+namespace UnlockFps;
 
 public partial class App : Application
 {

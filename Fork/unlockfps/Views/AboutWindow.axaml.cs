@@ -1,9 +1,9 @@
 using System.Diagnostics;
 using Avalonia.Controls;
 using Avalonia.Input;
-using UnlockFps.Gui.Utils;
+using UnlockFps.Utils;
 
-namespace UnlockFps.Gui.Views;
+namespace UnlockFps.Views;
 
 public partial class AboutWindow : Window
 {

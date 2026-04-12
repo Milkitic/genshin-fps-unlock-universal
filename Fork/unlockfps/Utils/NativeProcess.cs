@@ -63,6 +63,18 @@ internal sealed class NativeProcess : IDisposable
         return true;
     }
 
+    public bool TryGetMainModule([NotNullWhen(true)] out NativeModuleInfo? module)
+    {
+        if (!TryGetImagePath(out var imagePath))
+        {
+            module = null;
+            return false;
+        }
+
+        var mainModuleName = Path.GetFileName(imagePath);
+        return TryGetModule(mainModuleName, out module);
+    }
+
     public bool TryGetModule(string moduleName, [NotNullWhen(true)] out NativeModuleInfo? module)
     {
         if (TryGetModules([moduleName], out var modules) &&

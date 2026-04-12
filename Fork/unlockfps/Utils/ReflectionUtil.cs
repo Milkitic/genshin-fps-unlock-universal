@@ -1,7 +1,7 @@
 ﻿using System.Reflection;
 using Semver;
 
-namespace UnlockFps.Gui.Utils;
+namespace UnlockFps.Utils;
 
 internal static class ReflectionUtil
 {

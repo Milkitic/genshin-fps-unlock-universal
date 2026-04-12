@@ -1,10 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-
-
-namespace OSVersionExt
+﻿namespace UnlockFps.OSVersionExt.Win32API
 {
     /// <summary>
     /// Flags used with the Windows API (User32.dll):GetSystemMetrics(SystemMetric smIndex)

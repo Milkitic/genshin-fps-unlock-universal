@@ -1,12 +1,7 @@
-﻿using OSVersionExt.Win32API;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Runtime.InteropServices;
+﻿using System.Runtime.InteropServices;
 using System.Security;
-using System.Text;
 
-namespace OSVersionExt
+namespace UnlockFps.OSVersionExt.Win32API
 {
     /// <summary>
     /// Win32 API Provider

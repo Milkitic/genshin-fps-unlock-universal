@@ -1,9 +1,7 @@
-﻿using System;
-using System.Linq;
-using System.Reflection;
+﻿using System.Reflection;
 using System.Runtime.Loader;
 
-namespace UnlockFps.Gui.Utils;
+namespace UnlockFps.Utils;
 
 internal static class AssemblyAttributeUtil
 {

@@ -358,6 +358,35 @@ public struct IMAGE_DATA_DIRECTORY
     public uint Size;
 }
 
+[StructLayout(LayoutKind.Sequential, Pack = 1)]
+public unsafe struct IMAGE_SECTION_HEADER
+{
+    public fixed byte Name[8];
+    public uint VirtualSize;
+    public uint VirtualAddress;
+    public uint SizeOfRawData;
+    public uint PointerToRawData;
+    public uint PointerToRelocations;
+    public uint PointerToLinenumbers;
+    public ushort NumberOfRelocations;
+    public ushort NumberOfLinenumbers;
+    public uint Characteristics;
+
+    public string GetName()
+    {
+        fixed (byte* nameBytes = Name)
+        {
+            var length = 0;
+            while (length < 8 && nameBytes[length] != 0)
+            {
+                length++;
+            }
+
+            return Encoding.ASCII.GetString(nameBytes, length);
+        }
+    }
+}
+
 [StructLayout(LayoutKind.Sequential)]
 public struct MODULEINFO
 {

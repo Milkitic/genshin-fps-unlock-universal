@@ -1,6 +1,6 @@
-﻿using OSVersionExt.Registry;
+﻿using UnlockFps.OSVersionExt.Registry;
 
-namespace OSVersionExt.MajorVersion10
+namespace UnlockFps.OSVersionExt.MajorVersion10
 {
     public class RegistryProviderDefault : IRegistry
     {

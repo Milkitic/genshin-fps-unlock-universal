@@ -1,10 +1,6 @@
-﻿using OSVersionExt.Registry;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
+﻿using UnlockFps.OSVersionExt.Registry;
 
-namespace OSVersionExt.MajorVersion10
+namespace UnlockFps.OSVersionExt.MajorVersion10
 {
     public readonly struct RegistryEntry
     {

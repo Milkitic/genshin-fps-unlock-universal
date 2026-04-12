@@ -1,11 +1,9 @@
-﻿using System;
-using System.Collections;
+﻿using System.Collections;
 using System.Globalization;
-using System.Linq;
 using Avalonia;
 using Avalonia.Data.Converters;
 
-namespace UnlockFps.Gui.Converters;
+namespace UnlockFps.Converters;
 
 internal sealed class HasItemsConverter : IValueConverter
 {

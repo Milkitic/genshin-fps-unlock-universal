@@ -1,10 +1,6 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Runtime.InteropServices;
-using System.Text;
+﻿using System.Runtime.InteropServices;
 
-namespace OSVersionExt.Win32API
+namespace UnlockFps.OSVersionExt.Win32API
 {
     /// <summary>
     /// Holds information, whether the Windows is a server, workstation or domain controller.

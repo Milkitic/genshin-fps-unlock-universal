@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
     <TargetFramework>net10.0</TargetFramework>
@@ -9,7 +9,7 @@
     <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
     <ApplicationIcon>Assets\icon.ico</ApplicationIcon>
     <RuntimeIdentifiers>win-x64</RuntimeIdentifiers>
-    <RootNamespace>UnlockFps.Gui</RootNamespace>
+    <RootNamespace>UnlockFps</RootNamespace>
     <AssemblyName>unlockfps</AssemblyName>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
 
@@ -72,7 +72,6 @@
     <!--<PackageReference Include="PublishAotCompressed" Version="1.0.3" >
       <PrivateAssets>all</PrivateAssets>
     </PackageReference>-->
-    <PackageReference Include="Reloaded.Memory.Sigscan" Version="3.1.8" />
     <PackageReference Include="Semver" Version="3.0.0" />
   </ItemGroup>
 

@@ -1,4 +1,4 @@
-﻿using System.Runtime.InteropServices;
+using System.Runtime.InteropServices;
 using System.Text;
 
 namespace UnlockFps.Utils;
@@ -149,49 +149,87 @@ internal class ProcessUtils
         return true;
     }
 
-    public static unsafe nint PatternScan(nint module, string signature)
+    public static unsafe IReadOnlyList<nint> PatternScanAll(ModuleSectionInfo section, string signature)
+    {
+        var sectionBytes = new ReadOnlySpan<byte>((void*)section.Address, section.Size);
+        return PatternScanAll(sectionBytes, signature, section.Address);
+    }
+
+    public static bool TryGetSection(nint module, string sectionName, out ModuleSectionInfo section)
     {
         var dosHeader = Marshal.PtrToStructure<IMAGE_DOS_HEADER>(module);
-        var ntHeader = Marshal.PtrToStructure<IMAGE_NT_HEADERS>((nint)(module.ToInt64() + dosHeader.e_lfanew));
+        var ntHeaderAddress = module + dosHeader.e_lfanew;
+        var ntHeader = Marshal.PtrToStructure<IMAGE_NT_HEADERS>(ntHeaderAddress);
+        var sectionHeaderAddress = ntHeaderAddress + Marshal.SizeOf<IMAGE_NT_HEADERS>();
+        var sectionHeaderSize = Marshal.SizeOf<IMAGE_SECTION_HEADER>();
 
-        var sizeOfImage = ntHeader.OptionalHeader.SizeOfImage;
-
-        using var scanner = new Reloaded.Memory.Sigscan.Scanner((byte*)module.ToPointer(), (int)sizeOfImage);
-
-        var result = scanner.FindPattern(signature);
-        if (result.Found)
+        for (var i = 0; i < ntHeader.FileHeader.NumberOfSections; i++)
         {
-            return (nint)(module.ToInt64() + result.Offset);
+            var currentSection = Marshal.PtrToStructure<IMAGE_SECTION_HEADER>(sectionHeaderAddress + i * sectionHeaderSize);
+            if (!sectionName.Equals(currentSection.GetName(), StringComparison.Ordinal))
+                continue;
+
+            var size = checked((int)(currentSection.VirtualSize == 0 ? currentSection.SizeOfRawData : currentSection.VirtualSize));
+            section = new ModuleSectionInfo(module + (int)currentSection.VirtualAddress, size);
+            return true;
         }
 
-        return nint.Zero;
+        section = default;
+        return false;
     }
 
-    public static nint GetModuleBase(nint hProcess, string moduleName)
+    private static IReadOnlyList<nint> PatternScanAll(ReadOnlySpan<byte> data, string signature, nint baseAddress)
     {
-        var modules = new nint[1024];
+        var (patternBytes, wildcardMask) = ParseSignature(signature);
+        var results = new List<nint>();
+        if (patternBytes.Length == 0 || data.Length < patternBytes.Length)
+            return results;
 
-        if (!Native.EnumProcessModules(hProcess, modules, (uint)(modules.Length * nint.Size), out var bytesNeeded))
+        for (var offset = 0; offset <= data.Length - patternBytes.Length; offset++)
         {
-            if (Marshal.GetLastWin32Error() != 299)
-                return nint.Zero;
+            if (!IsPatternMatch(data, offset, patternBytes, wildcardMask))
+                continue;
+
+            results.Add(baseAddress + offset);
         }
 
-        foreach (var module in modules.Where(x => x != nint.Zero))
+        return results;
+    }
+
+    private static bool IsPatternMatch(ReadOnlySpan<byte> data, int offset, byte[] patternBytes, bool[] wildcardMask)
+    {
+        for (var i = 0; i < patternBytes.Length; i++)
         {
-            StringBuilder sb = new StringBuilder(1024);
-            if (Native.GetModuleBaseName(hProcess, module, sb, (uint)sb.Capacity) == 0)
+            if (wildcardMask[i])
                 continue;
 
-            if (sb.ToString() != moduleName)
-                continue;
-
-            if (!Native.GetModuleInformation(hProcess, module, out var moduleInfo, (uint)Marshal.SizeOf<MODULEINFO>()))
-                continue;
-
-            return moduleInfo.lpBaseOfDll;
+            if (data[offset + i] != patternBytes[i])
+                return false;
         }
 
-        return nint.Zero;
+        return true;
+    }
+
+    private static (byte[] Bytes, bool[] WildcardMask) ParseSignature(string signature)
+    {
+        var tokens = signature.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        var patternBytes = new byte[tokens.Length];
+        var wildcardMask = new bool[tokens.Length];
+
+        for (var i = 0; i < tokens.Length; i++)
+        {
+            var token = tokens[i];
+            if (token is "?" or "??")
+            {
+                wildcardMask[i] = true;
+                continue;
+            }
+
+            patternBytes[i] = Convert.ToByte(token, 16);
+        }
+
+        return (patternBytes, wildcardMask);
     }
 }
+
+internal readonly record struct ModuleSectionInfo(nint Address, int Size);

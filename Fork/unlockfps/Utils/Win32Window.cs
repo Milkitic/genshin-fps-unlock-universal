@@ -2,7 +2,6 @@ using System.Buffers;
 using System.Runtime.Versioning;
 using Windows.Win32;
 using Windows.Win32.Foundation;
-using UnlockFps.Gui.Utils;
 
 namespace UnlockFps.Utils;
 

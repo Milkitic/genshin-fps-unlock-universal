@@ -17,7 +17,6 @@ public class GameInstanceService : IDisposable, INotifyPropertyChanged
     public event Action<uint>? ProcessExit;
 
     private static readonly ILogger Logger = LogManager.GetLogger(nameof(GameInstanceService));
-    private static readonly string[] RequiredModules = ["UnityPlayer.dll", "UserAssembly.dll"];
     private const uint MonitoringProcessAccess =
         ProcessAccess.QUERY_INFORMATION |
         ProcessAccess.QUERY_LIMITED_INFORMATION |
@@ -258,14 +257,13 @@ public class GameInstanceService : IDisposable, INotifyPropertyChanged
         };
         try
         {
-            Logger.LogInformation($"Trying to get remote module base address...");
-            var success = GetProcessModules(Context, CancellationToken.None);
+            Logger.LogInformation("Trying to get main module information...");
+            var success = TryResolveMainModule(Context, CancellationToken.None);
             if (!success) return false;
-            Logger.LogInformation($"Get remote module base address successfully.");
+            Logger.LogInformation("Get main module information successfully.");
 
             Logger.LogInformation($"Trying to get FPS address...");
-            processContext.FpsValueAddress = FpsPatterns.ProvideAddress(Context.UnityPlayerModule,
-                processContext.UserAssemblyModule, nativeProcess.Handle);
+            processContext.FpsValueAddress = FpsPatterns.ProvideAddress(processContext.MainModule!);
             Logger.LogInformation($"Get FPS address successfully: {processContext.FpsValueAddress}");
             return true;
         }
@@ -290,8 +288,7 @@ public class GameInstanceService : IDisposable, INotifyPropertyChanged
         }
 
         var gameDirectory = Path.GetDirectoryName(processPath);
-        if (string.IsNullOrEmpty(gameDirectory) ||
-            !File.Exists(Path.Combine(gameDirectory, "UnityPlayer.dll")))
+        if (string.IsNullOrEmpty(gameDirectory))
         {
             fileName = null;
             directoryName = null;
@@ -303,27 +300,15 @@ public class GameInstanceService : IDisposable, INotifyPropertyChanged
         return true;
     }
 
-    private bool GetProcessModules(ProcessContext processContext, CancellationToken token)
+    private bool TryResolveMainModule(ProcessContext processContext, CancellationToken token)
     {
         int retryCount = 0;
 
         while (!processContext.NativeProcess.HasExited && !token.IsCancellationRequested)
         {
-            if (processContext.NativeProcess.TryGetModules(RequiredModules, out var modules))
+            if (processContext.NativeProcess.TryGetMainModule(out var mainModule))
             {
-                if (modules.TryGetValue("UnityPlayer.dll", out var unityPlayerModule))
-                {
-                    processContext.UnityPlayerModule = unityPlayerModule;
-                }
-
-                if (modules.TryGetValue("UserAssembly.dll", out var userAssemblyModule))
-                {
-                    processContext.UserAssemblyModule = userAssemblyModule;
-                }
-            }
-
-            if (processContext is { UnityPlayerModule: not null, UserAssemblyModule: not null })
-            {
+                processContext.MainModule = mainModule;
                 break;
             }
 
@@ -334,10 +319,10 @@ public class GameInstanceService : IDisposable, INotifyPropertyChanged
 
             if (!TaskUtils.TaskSleep(500, token)) break;
             retryCount++;
-            Logger.LogDebug($"({retryCount}) Trying to get remote module base address...");
+            Logger.LogDebug($"({retryCount}) Trying to get main module information...");
         }
 
-        return processContext is { UnityPlayerModule: not null, UserAssemblyModule: not null };
+        return processContext.MainModule != null;
     }
 
     private void ApplyFpsLimit(ProcessContext context)
@@ -416,8 +401,7 @@ public class GameInstanceService : IDisposable, INotifyPropertyChanged
         public required string FileName { get; init; }
         public required string DirectoryName { get; init; }
 
-        public NativeModuleInfo UnityPlayerModule { get; set; } = null!;
-        public NativeModuleInfo UserAssemblyModule { get; set; } = null!;
+        public NativeModuleInfo? MainModule { get; set; }
         public bool IsFpsApplied { get; set; }
 
         public IntPtr FpsValueAddress { get; set; }

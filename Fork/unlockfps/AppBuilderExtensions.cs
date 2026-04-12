@@ -1,9 +1,8 @@
-﻿using System;
-using Avalonia;
+﻿using Avalonia;
 using Avalonia.Media;
 using SkiaSharp;
 
-namespace UnlockFps.Gui;
+namespace UnlockFps;
 
 public static class AppBuilderExtensions
 {

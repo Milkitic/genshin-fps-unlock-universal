@@ -1,8 +1,7 @@
-﻿using System;
-using System.Globalization;
+﻿using System.Globalization;
 using Avalonia.Data.Converters;
 
-namespace UnlockFps.Gui.Converters;
+namespace UnlockFps.Converters;
 
 internal sealed class FullPath2NameConverter : IValueConverter
 {

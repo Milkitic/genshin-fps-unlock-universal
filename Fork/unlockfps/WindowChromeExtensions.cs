@@ -1,13 +1,12 @@
-using System;
 using System.Runtime.InteropServices;
-using System.Threading.Tasks;
 using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
 using Avalonia.Media;
 using Avalonia.Platform;
-using OSVersionExtension;
+using UnlockFps.OSVersionExt;
+using OperatingSystem = UnlockFps.OSVersionExt.OperatingSystem;
 
-namespace UnlockFps.Gui;
+namespace UnlockFps;
 
 public static class WindowChromeExtensions
 {
@@ -64,14 +63,14 @@ public static class WindowChromeExtensions
         var version = OSVersion.GetOperatingSystem();
         if (window.IsActive)
         {
-            if (version is OSVersionExtension.OperatingSystem.Windows11)
+            if (version is OperatingSystem.Windows11)
             {
                 window.Background = isDark
                     ? SolidColorBrush.Parse("#80202020")
                     : SolidColorBrush.Parse("#DDF3F3F3");
                 window.TransparencyLevelHint = new[] { WindowTransparencyLevel.Mica };
             }
-            else if (version is OSVersionExtension.OperatingSystem.Windows10)
+            else if (version is OperatingSystem.Windows10)
             {
                 window.Background = isDark
                     ? SolidColorBrush.Parse("#80202020")

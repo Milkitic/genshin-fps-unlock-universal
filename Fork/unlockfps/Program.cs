@@ -1,7 +1,7 @@
 ﻿using Avalonia;
 using UnlockFps.Utils;
 
-namespace UnlockFps.Gui;
+namespace UnlockFps;
 
 internal sealed class Program
 {

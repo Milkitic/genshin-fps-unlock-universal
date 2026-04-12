@@ -1,12 +1,10 @@
-﻿using OSVersionExt;
-using OSVersionExt.Environment;
-using OSVersionExt.MajorVersion10;
-using OSVersionExt.Win32API;
-using System;
-using System.Runtime.InteropServices;
+﻿using System.Runtime.InteropServices;
 using System.Security;
+using UnlockFps.OSVersionExt.Environment;
+using UnlockFps.OSVersionExt.MajorVersion10;
+using UnlockFps.OSVersionExt.Win32API;
 
-namespace OSVersionExtension
+namespace UnlockFps.OSVersionExt
 {
     /// <summary>
     /// Detects Windows version starting with Windows 2000 and also works on Windows 11/ Windows 10/Server 2022/Server 2019/Server 2016 right away.

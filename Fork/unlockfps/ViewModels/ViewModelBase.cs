@@ -1,5 +1,5 @@
 ﻿using CommunityToolkit.Mvvm.ComponentModel;
 
-namespace UnlockFps.Gui.ViewModels;
+namespace UnlockFps.ViewModels;
 
 public class ViewModelBase : ObservableObject;

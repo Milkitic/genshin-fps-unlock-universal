@@ -1,10 +1,10 @@
 <Window
-    x:Class="UnlockFps.Gui.Views.InitializationWindow"
+    x:Class="UnlockFps.Views.InitializationWindow"
     xmlns="https://github.com/avaloniaui"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-    xmlns:viewModels="clr-namespace:UnlockFps.Gui.ViewModels"
+    xmlns:viewModels="clr-namespace:UnlockFps.Views"
     Title="Initialization"
     Width="475" Loaded="Control_OnLoaded"
     CanResize="False"

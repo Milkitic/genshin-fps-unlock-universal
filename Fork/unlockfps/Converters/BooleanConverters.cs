@@ -1,6 +1,6 @@
 ﻿using Avalonia.Data.Converters;
 
-namespace UnlockFps.Gui.Converters;
+namespace UnlockFps.Converters;
 
 public static class BooleanConverters
 {

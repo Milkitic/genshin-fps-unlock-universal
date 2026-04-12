@@ -2,7 +2,7 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Interactivity;
 
-namespace UnlockFps.Gui.Views;
+namespace UnlockFps.Views;
 
 public partial class AlertWindow : Window
 {

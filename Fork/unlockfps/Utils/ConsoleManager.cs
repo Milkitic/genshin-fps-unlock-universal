@@ -1,11 +1,8 @@
-﻿using System;
-using System.Diagnostics;
-using System.IO;
-using System.Reflection.Metadata;
+﻿using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Security;
 
-namespace UnlockFps.Gui.Utils;
+namespace UnlockFps.Utils;
 
 [SuppressUnmanagedCodeSecurity]
 internal static class ConsoleManager

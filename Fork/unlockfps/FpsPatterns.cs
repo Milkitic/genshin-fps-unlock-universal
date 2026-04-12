@@ -1,4 +1,3 @@
-using System.Runtime.InteropServices;
 using UnlockFps.Logging;
 using UnlockFps.Utils;
 
@@ -7,84 +6,75 @@ namespace UnlockFps;
 internal static class FpsPatterns
 {
     private static readonly ILogger Logger = LogManager.GetLogger(nameof(FpsPatterns));
+    private const uint LoadLibraryAsImageResource = 0x20;
+    private const string Il2CppSectionName = "il2cpp";
+    private const string FpsPattern = "B9 3C 00 00 00 E8";
 
-    public static unsafe nint ProvideAddress(NativeModuleInfo mdUnityPlayer, NativeModuleInfo mdUserAssembly, nint processHandle)
+    public static unsafe nint ProvideAddress(NativeModuleInfo mainModule)
     {
-        var unityPlayerPath = mdUnityPlayer.FilePath;
-        var userAssemblyPath = mdUserAssembly.FilePath;
-
-        using ModuleGuard shUnityPlayer = Utils.NativeMethods.LoadLibraryEx(unityPlayerPath, nint.Zero, 0x20);
-        using ModuleGuard shUserAssembly = Utils.NativeMethods.LoadLibraryEx(userAssemblyPath, nint.Zero, 0x20);
-
-        var pUnityPlayer = shUnityPlayer.BaseAddress;
-        var pUserAssembly = shUserAssembly.BaseAddress;
-
-        var dosHeader = Marshal.PtrToStructure<IMAGE_DOS_HEADER>(pUnityPlayer);
-        var ntHeader =
-            Marshal.PtrToStructure<IMAGE_NT_HEADERS>((nint)(pUnityPlayer.ToInt64() + dosHeader.e_lfanew));
-
-        if (ntHeader.FileHeader.TimeDateStamp < 0x656FFAF7U) // < 3.7
+        using ModuleGuard mappedMainModule = NativeMethods.LoadLibraryEx(mainModule.FilePath, nint.Zero, LoadLibraryAsImageResource);
+        if (!mappedMainModule)
         {
-            Logger.LogDebug($"TimeDateStamp: {ntHeader.FileHeader.TimeDateStamp}, <3.7");
-            var addressPtr = ProcessUtils.PatternScan(pUnityPlayer, "7F 0F 8B 05 ?? ?? ?? ??");
-            byte* address = (byte*)addressPtr;
-            if (address == null) throw new Exception("Unrecognized FPS pattern.");
-
-            Logger.LogDebug($"Scanned pattern successfully: 0x{addressPtr:X16}");
-            byte* rip = address + 2;
-            int rel = *(int*)(rip + 2);
-            var localVa = rip + rel + 6;
-            var rva = localVa - pUnityPlayer.ToInt64();
-            return (nint)(pUnityPlayer.ToInt64() + rva);
-        }
-        else
-        {
-            byte* rip = null;
-            if (ntHeader.FileHeader.TimeDateStamp < 0x656FFAF7U) // < 4.3
-            {
-                Logger.LogDebug($"TimeDateStamp: {ntHeader.FileHeader.TimeDateStamp}, <4.3");
-                var addressPtr =
-                    ProcessUtils.PatternScan(pUserAssembly, "E8 ?? ?? ?? ?? 85 C0 7E 07 E8 ?? ?? ?? ?? EB 05");
-                byte* address = (byte*)addressPtr;
-                if (address == null) throw new Exception("Unrecognized FPS pattern.");
-
-                Logger.LogDebug($"Scanned pattern successfully: 0x{addressPtr:X16}");
-                rip = address;
-                rip += *(int*)(rip + 1) + 5;
-                rip += *(int*)(rip + 3) + 7;
-            }
-            else
-            {
-                Logger.LogDebug($"TimeDateStamp: {ntHeader.FileHeader.TimeDateStamp}");
-                var addressPtr = ProcessUtils.PatternScan(pUserAssembly, "B9 3C 00 00 00 FF 15");
-                byte* address = (byte*)addressPtr;
-                if (address == null) throw new Exception("Unrecognized FPS pattern.");
-
-                Logger.LogDebug($"Scanned pattern successfully: 0x{addressPtr:X16}");
-                rip = address;
-                rip += 5;
-                rip += *(int*)(rip + 2) + 6;
-            }
-
-            byte* remoteVa = rip - pUserAssembly.ToInt64() + mdUserAssembly.BaseAddress.ToInt64();
-            byte* dataPtr = null;
-
-            Span<byte> readResult = stackalloc byte[8];
-            while (dataPtr == null)
-            {
-                Utils.NativeMethods.ReadProcessMemory(processHandle, (nint)remoteVa, readResult, readResult.Length, out _);
-                ulong value = BitConverter.ToUInt64(readResult);
-                dataPtr = (byte*)value;
-            }
-
-            byte* localVa = dataPtr - mdUnityPlayer.BaseAddress.ToInt64() + pUnityPlayer.ToInt64();
-            while (localVa[0] == 0xE8 || localVa[0] == 0xE9)
-                localVa += *(int*)(localVa + 1) + 5;
-
-            localVa += *(int*)(localVa + 2) + 6;
-            var rva = localVa - pUnityPlayer.ToInt64();
-            return (nint)(mdUnityPlayer.BaseAddress.ToInt64() + rva);
+            throw new InvalidOperationException($"Failed to map main module image: {mainModule.FilePath}");
         }
 
+        if (!ProcessUtils.TryGetSection(mappedMainModule.BaseAddress, Il2CppSectionName, out var il2cppSection))
+        {
+            throw new InvalidOperationException($"Failed to find '{Il2CppSectionName}' section in {mainModule.FilePath}.");
+        }
+
+        var candidates = ProcessUtils.PatternScanAll(il2cppSection, FpsPattern);
+        Logger.LogDebug($"Found {candidates.Count} FPS pattern candidate(s) in {Il2CppSectionName}.");
+
+        foreach (var candidateAddress in candidates)
+        {
+            var localFpsAddress = TryResolveLocalFpsAddress((byte*)candidateAddress);
+            if (localFpsAddress == null)
+                continue;
+
+            var localImageBase = (byte*)mappedMainModule.BaseAddress;
+            var remoteImageBase = (byte*)mainModule.BaseAddress;
+            var remoteFpsAddress = remoteImageBase + (localFpsAddress - localImageBase);
+
+            Logger.LogDebug($"Resolved FPS address: local=0x{(nint)localFpsAddress:X16}, remote=0x{(nint)remoteFpsAddress:X16}");
+            return (nint)remoteFpsAddress;
+        }
+
+        throw new InvalidOperationException("Unrecognized FPS pattern.");
+    }
+
+    private static unsafe byte* TryResolveLocalFpsAddress(byte* candidate)
+    {
+        var branch = candidate + 5;
+        if (!IsExpectedBranchChain(branch))
+            return null;
+
+        while (branch[0] is 0xE8 or 0xE9)
+        {
+            branch = FollowBranch(branch);
+        }
+
+        return ResolveRipRelativeAddress(branch, displacementOffset: 2, instructionSize: 6);
+    }
+
+    private static unsafe bool IsExpectedBranchChain(byte* branch)
+    {
+        if (branch[0] != 0xE8)
+            return false;
+
+        var firstTarget = FollowBranch(branch);
+        return firstTarget[0] == 0xE9;
+    }
+
+    private static unsafe byte* FollowBranch(byte* instruction)
+    {
+        var displacement = *(int*)(instruction + 1);
+        return instruction + displacement + 5;
+    }
+
+    private static unsafe byte* ResolveRipRelativeAddress(byte* instruction, int displacementOffset, int instructionSize)
+    {
+        var displacement = *(int*)(instruction + displacementOffset);
+        return instruction + displacement + instructionSize;
     }
 }

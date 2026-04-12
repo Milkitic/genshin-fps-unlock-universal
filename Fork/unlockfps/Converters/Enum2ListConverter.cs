@@ -1,9 +1,7 @@
-﻿using System;
-using System.Globalization;
-using System.Linq;
+﻿using System.Globalization;
 using Avalonia.Data.Converters;
 
-namespace UnlockFps.Gui.Converters;
+namespace UnlockFps.Converters;
 
 internal sealed class Enum2ListConverter : IValueConverter
 {
