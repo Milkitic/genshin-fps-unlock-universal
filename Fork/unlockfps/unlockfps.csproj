@@ -23,6 +23,10 @@
 
   </PropertyGroup>
 
+  <PropertyGroup Condition="'$(Configuration)' == 'Debug'">
+    <OutputType>Exe</OutputType>
+  </PropertyGroup>
+
   <PropertyGroup Condition="'$(Configuration)' != 'Debug'">
     <PublishTrimmed>true</PublishTrimmed>
     <PublishAot>true</PublishAot>

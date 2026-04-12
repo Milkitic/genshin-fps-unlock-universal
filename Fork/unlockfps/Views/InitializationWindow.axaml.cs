@@ -1,6 +1,4 @@
 using System.Collections.ObjectModel;
-using System.Globalization;
-using System.Text;
 using Avalonia.Controls;
 using Avalonia.Interactivity;
 using Avalonia.Platform.Storage;
@@ -129,60 +127,19 @@ public partial class InitializationWindow : Window
     private void SearchRegistry(CancellationToken token = default)
     {
         if (_viewModel == null) return;
-
-        using var uninstallKey =
-            Registry.LocalMachine?.OpenSubKey(@"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall");
-        if (uninstallKey == null) return;
-
-        var keys = uninstallKey.GetSubKeyNames();
         var installationPaths = _viewModel.InstallationPaths;
-
-        foreach (var key in keys)
-        {
-            if (key is not ("Genshin Impact" or "\u539f\u795e")) continue;
-
-            using var subKey = uninstallKey.OpenSubKey(key);
-            if (subKey == null)
-            {
-                return;
-            }
-
-            var installationDir = (string?)subKey.GetValue("InstallPath");
-            if (!Directory.Exists(installationDir)) continue;
-
-            var configPath = Path.Combine(installationDir, "config.ini");
-            if (!File.Exists(configPath)) continue;
-
-            string? gamePath = null;
-            string? gameName = null;
-            var configLines = File.ReadLines(configPath);
-            foreach (var line in configLines)
-            {
-                var indexOf = line.IndexOf('=');
-                if (indexOf < 0) continue;
-
-                var iniKey = GetIniKey(line, indexOf);
-                if (iniKey.Equals("game_install_path", StringComparison.Ordinal))
-                {
-                    gamePath = ConvertIniValue(GetIniValue(line, indexOf));
-                }
-                else if (iniKey.Equals("game_start_name", StringComparison.Ordinal))
-                {
-                    gameName = GetIniValue(line, indexOf);
-                }
-            }
-
-            if (gamePath == null || gameName == null) continue;
-
-            var combine = Path.GetFullPath(Path.Combine(gamePath, gameName));
-            if (File.Exists(combine))
-            {
-                Dispatcher.UIThread.Invoke(() =>
-                {
-                    installationPaths.Add(Path.GetFullPath(combine));
-                });
-            }
-        }
+        TryAddInstallationPath(
+            Registry.CurrentUser.OpenSubKey(@"SOFTWARE\Cognosphere\HYP\1_1\hk4e_global"),
+            "GameInstallPath",
+            "GenshinImpact.exe",
+            installationPaths,
+            token);
+        TryAddInstallationPath(
+            Registry.CurrentUser.OpenSubKey(@"SOFTWARE\miHoYo\HYP\1_1\hk4e_cn"),
+            "GameInstallPath",
+            "YuanShen.exe",
+            installationPaths,
+            token);
 
         var selectedPath = _viewModel.SelectedInstallationPath;
         if (installationPaths.Count > 0 && (selectedPath == null || !installationPaths.Contains(selectedPath)))
@@ -194,38 +151,27 @@ public partial class InitializationWindow : Window
     }
 #pragma warning restore CA1416
 
-    private static string GetIniKey(string s, int indexOf)
+    private static void TryAddInstallationPath(RegistryKey? key, string valueName, string exeName,
+        ObservableCollection<string> installationPaths, CancellationToken token)
     {
-        return s.Substring(0, indexOf).Trim();
-    }
-
-    private static string GetIniValue(string s, int indexOf)
-    {
-        return s.Substring(indexOf + 1).Trim();
-    }
-
-    private static string ConvertIniValue(string iniValue)
-    {
-        var stringBuilder = new StringBuilder();
-        var charSpan = iniValue.AsSpan();
-        for (var i = 0; i < charSpan.Length; i++)
+        using (key)
         {
-            var c = iniValue[i];
-            if (c == '\\' && i < charSpan.Length - 5 && charSpan[i + 1] == 'x')
+            if (token.IsCancellationRequested || key == null) return;
+
+            var installPath = key.GetValue(valueName) as string;
+            if (string.IsNullOrWhiteSpace(installPath)) return;
+
+            var gamePath = Path.GetFullPath(Path.Combine(installPath, exeName));
+            if (!File.Exists(gamePath)) return;
+
+            Dispatcher.UIThread.Invoke(() =>
             {
-                var readOnlySpan = charSpan.Slice(i + 2, 4);
-                if (ushort.TryParse(readOnlySpan, NumberStyles.HexNumber, null, out var value))
+                if (!installationPaths.Contains(gamePath))
                 {
-                    stringBuilder.Append((char)value);
-                    i += 5;
-                    continue;
+                    installationPaths.Add(gamePath);
                 }
-            }
-
-            stringBuilder.Append(c);
+            });
         }
-
-        return stringBuilder.ToString();
     }
 
     private void BtnConfirm_OnClick(object? sender, RoutedEventArgs e)
