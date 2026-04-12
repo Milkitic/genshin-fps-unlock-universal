@@ -7,7 +7,6 @@ using UnlockFps.Logging;
 using UnlockFps.Utils;
 using Windows.Win32.Foundation;
 using Windows.Win32.UI.Accessibility;
-using static Windows.Win32.PInvoke;
 
 namespace UnlockFps.Services;
 
@@ -96,20 +95,12 @@ public class GameInstanceService : IDisposable, INotifyPropertyChanged
                 Logger.LogInformation($"[{Thread.CurrentThread.Name}] Attempting to find game window (Event Mode)");
 
                 _eventCallBack = WinEventProc;
-                _winEventHook = SetWinEventHook(
-                    EVENT_SYSTEM_FOREGROUND,
-                    EVENT_SYSTEM_FOREGROUND,
-                    HMODULE.Null,
-                    _eventCallBack,
-                    0,
-                    0,
-                    WINEVENT_OUTOFCONTEXT | WINEVENT_SKIPOWNPROCESS
-                );
+                _winEventHook = NativeMethods.SetForegroundWinEventHook(_eventCallBack);
                 if (_hwndSynchronizationContext == null) return;
-                if (GetMessage(out var lpMsg, default, default, default))
+                if (NativeMethods.GetMessage(out var lpMsg, default, default, default))
                 {
-                    TranslateMessage(in lpMsg);
-                    DispatchMessage(in lpMsg);
+                    NativeMethods.TranslateMessage(in lpMsg);
+                    NativeMethods.DispatchMessage(in lpMsg);
                 }
             }
             else
@@ -119,7 +110,7 @@ public class GameInstanceService : IDisposable, INotifyPropertyChanged
                 nint lastWindow = 0;
                 _timer = new Timer(_ =>
                 {
-                    var foregroundWindow = GetForegroundWindow();
+                    var foregroundWindow = NativeMethods.GetForegroundWindow();
                     if (lastWindow != foregroundWindow)
                     {
                         var win32Window = new Win32Window(foregroundWindow);
@@ -130,7 +121,7 @@ public class GameInstanceService : IDisposable, INotifyPropertyChanged
             }
         }, null);
 
-        var win32Window = new Win32Window(GetForegroundWindow());
+        var win32Window = new Win32Window(NativeMethods.GetForegroundWindow());
         _synchronizationContext.Send(CallBack, win32Window);
     }
 
@@ -140,7 +131,7 @@ public class GameInstanceService : IDisposable, INotifyPropertyChanged
         {
             _hwndSynchronizationContext?.Post(_ =>
             {
-                if (!_winEventHook.IsNull && UnhookWinEvent(_winEventHook))
+                if (!_winEventHook.IsNull && NativeMethods.UnhookWinEvent(_winEventHook))
                 {
                     _winEventHook = default;
                 }
@@ -148,7 +139,7 @@ public class GameInstanceService : IDisposable, INotifyPropertyChanged
         }
         else
         {
-            if (!_winEventHook.IsNull && UnhookWinEvent(_winEventHook))
+            if (!_winEventHook.IsNull && NativeMethods.UnhookWinEvent(_winEventHook))
             {
                 _winEventHook = default;
             }
@@ -325,10 +316,11 @@ public class GameInstanceService : IDisposable, INotifyPropertyChanged
         return processContext.MainModule != null;
     }
 
-    private void ApplyFpsLimit(ProcessContext context)
+    private unsafe void ApplyFpsLimit(ProcessContext context)
     {
         var isGameForegroundOld = context.IsGameInForeground;
-        context.IsGameInForeground = context.Win32Window != null && GetForegroundWindow() == context.Win32Window.Handle;
+        context.IsGameInForeground = context.Win32Window != null &&
+                                     NativeMethods.GetForegroundWindow() == context.Win32Window.Handle;
         if (context.IsGameInForeground != isGameForegroundOld)
         {
             var activeStr = context.IsGameInForeground ? "active" : "inactive";
@@ -354,15 +346,16 @@ public class GameInstanceService : IDisposable, INotifyPropertyChanged
         }
 
         Span<byte> buffer = stackalloc byte[4];
-        var readProcessMemory = NativeMethods.ReadProcessMemory(context.NativeProcess.Handle, context.FpsValueAddress,
-            buffer, 4, out var readBytes);
-        if (!readProcessMemory || readBytes != 4) return;
+        if (!NativeMethods.ReadProcessMemory(context.NativeProcess.Handle, context.FpsValueAddress, buffer,
+                out var readBytes) || readBytes != 4)
+            return;
 
         var currentFps = BitConverter.ToInt32(buffer);
         if (currentFps == fpsTarget) return;
 
         var toWrite = BitConverter.GetBytes(fpsTarget);
-        if (NativeMethods.WriteProcessMemory(context.NativeProcess.Handle, context.FpsValueAddress, toWrite, 4, out _))
+        if (NativeMethods.WriteProcessMemory(context.NativeProcess.Handle, context.FpsValueAddress, toWrite,
+                out var bytesWritten) && bytesWritten == (nuint)toWrite.Length)
         {
             Logger.LogInformation($"FPS Override: {currentFps} -> {fpsTarget}");
         }

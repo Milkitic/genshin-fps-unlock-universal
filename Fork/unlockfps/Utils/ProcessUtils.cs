@@ -12,7 +12,7 @@ internal class ProcessUtils
 
         StringBuilder sb = new StringBuilder(1024);
         uint bufferSize = (uint)sb.Capacity;
-        if (!Native.QueryFullProcessImageName(processHandle, 0, sb, ref bufferSize))
+        if (!NativeMethods.QueryFullProcessImageName(processHandle, 0, sb, ref bufferSize))
             return string.Empty;
 
         return sb.ToString();
@@ -20,7 +20,7 @@ internal class ProcessUtils
 
     public static string GetProcessPathFromPid(uint pid, out nint processHandle)
     {
-        processHandle = Native.OpenProcess(ProcessAccess.QUERY_LIMITED_INFORMATION, false, pid);
+        processHandle = NativeMethods.OpenProcess(ProcessAccess.QUERY_LIMITED_INFORMATION, false, pid);
         return GetProcessPath(processHandle);
     }
 
@@ -42,7 +42,7 @@ internal class ProcessUtils
         {
             if (processHandle != nint.Zero)
             {
-                Native.CloseHandle(processHandle);
+                NativeMethods.CloseHandle(processHandle);
             }
         }
     }
@@ -61,7 +61,7 @@ internal class ProcessUtils
         pid = 0;
 
         var processIds = new uint[2048];
-        if (!Native.EnumProcesses(processIds, (uint)(processIds.Length * sizeof(uint)), out var bytesNeeded))
+        if (!NativeMethods.EnumProcesses(processIds, (uint)(processIds.Length * sizeof(uint)), out var bytesNeeded))
             return false;
 
         var count = (int)(bytesNeeded / sizeof(uint));
@@ -94,11 +94,11 @@ internal class ProcessUtils
         {
             if (queryHandle != nint.Zero)
             {
-                Native.CloseHandle(queryHandle);
+                NativeMethods.CloseHandle(queryHandle);
             }
         }
 
-        processHandle = Native.OpenProcess(
+        processHandle = NativeMethods.OpenProcess(
             ProcessAccess.QUERY_LIMITED_INFORMATION |
             ProcessAccess.TERMINATE |
             StandardAccess.SYNCHRONIZE, false, pid);
@@ -116,12 +116,12 @@ internal class ProcessUtils
         if (dllPaths.Count == 0)
             return true;
 
-        Native.RtlAdjustPrivilege(20, true, false, out var _);
+        NativeMethods.RtlAdjustPrivilege(20, true, false, out var _);
 
-        var kernel32 = Native.LoadLibrary("kernel32.dll");
-        var loadLibrary = Native.GetProcAddress(kernel32, "LoadLibraryW");
+        var kernel32 = NativeMethods.LoadLibrary("kernel32.dll");
+        var loadLibrary = NativeMethods.GetProcAddress(kernel32, "LoadLibraryW");
 
-        var remoteVa = Native.VirtualAllocEx(processHandle, nint.Zero, 0x1000,
+        var remoteVa = NativeMethods.VirtualAllocEx(processHandle, nint.Zero, 0x1000,
             AllocationType.COMMIT | AllocationType.RESERVE, MemoryProtection.READWRITE);
         if (remoteVa == nint.Zero)
             return false;
@@ -132,19 +132,20 @@ internal class ProcessUtils
             var bytes = Encoding.Unicode.GetBytes(dllPath);
             Marshal.FreeHGlobal(nativeString);
 
-            if (!Native.WriteProcessMemory(processHandle, remoteVa, bytes, bytes.Length, out var bytesWritten))
+            if (!NativeMethods.WriteProcessMemory(processHandle, remoteVa, bytes, bytes.Length, out var bytesWritten))
                 return false;
 
-            var thread = Native.CreateRemoteThread(processHandle, nint.Zero, 0, loadLibrary, remoteVa, 0, out var threadId);
+            var thread = NativeMethods.CreateRemoteThread(processHandle, nint.Zero, 0, loadLibrary, remoteVa, 0,
+                out var threadId);
             if (thread == nint.Zero)
                 return false;
 
-            Native.WaitForSingleObject(thread, uint.MaxValue);
-            Native.CloseHandle(thread);
-            Native.WriteProcessMemory(processHandle, remoteVa, new byte[bytes.Length], bytes.Length, out _);
+            NativeMethods.WaitForSingleObject(thread, uint.MaxValue);
+            NativeMethods.CloseHandle(thread);
+            NativeMethods.WriteProcessMemory(processHandle, remoteVa, new byte[bytes.Length], bytes.Length, out _);
         }
 
-        Native.VirtualFreeEx(processHandle, remoteVa, 0, FreeType.RELEASE);
+        NativeMethods.VirtualFreeEx(processHandle, remoteVa, 0, FreeType.RELEASE);
 
         return true;
     }

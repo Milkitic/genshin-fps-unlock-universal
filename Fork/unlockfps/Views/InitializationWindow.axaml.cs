@@ -99,12 +99,12 @@ public partial class InitializationWindow : Window
         IntPtr processHandle = IntPtr.Zero;
         string processPath = string.Empty;
 
-        Native.EnumWindows((hWnd, lParam) =>
+        NativeMethods.EnumWindows((hWnd, lParam) =>
         {
             var win32Window = new Win32Window(hWnd);
             if (win32Window.ClassName != "UnityWndClass") return true;
 
-            var err = Native.GetWindowThreadProcessId(hWnd, out var pid);
+            var err = NativeMethods.GetWindowThreadProcessId(hWnd, out var pid);
             if (err == 0) return true;
 
             if (!ProcessUtils.TryGetGameProcessFromPid(pid, out processPath, out processHandle))
@@ -117,8 +117,8 @@ public partial class InitializationWindow : Window
         if (windowHandle == IntPtr.Zero)
             return ValueTask.FromResult(false);
 
-        Native.TerminateProcess(processHandle, 0);
-        Native.CloseHandle(processHandle);
+        NativeMethods.TerminateProcess(processHandle, 0);
+        NativeMethods.CloseHandle(processHandle);
 
         _configService.Config.LaunchOptions.GamePath = Path.GetFullPath(processPath);
         _configService.Save();

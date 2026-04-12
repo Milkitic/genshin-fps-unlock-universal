@@ -1,14 +1,10 @@
-using System.Buffers;
 using System.Runtime.Versioning;
-using Windows.Win32;
-using Windows.Win32.Foundation;
 
 namespace UnlockFps.Utils;
 
 [SupportedOSPlatform("windows5.0")]
 public class Win32Window
 {
-    private readonly HWND _hWnd;
     private string? _className;
     private string? _title;
     private string? _processName;
@@ -16,14 +12,14 @@ public class Win32Window
 
     public Win32Window(nint handle)
     {
-        _hWnd = (HWND)handle;
+        Handle = handle;
     }
 
-    public nint Handle => _hWnd;
+    public nint Handle { get; }
 
-    public string ClassName => _className ??= CallWin32ToGetPWSTR(512, (p, l) => PInvoke.GetClassName(_hWnd, p, l));
+    public string ClassName => _className ??= NativeMethods.GetClassName(Handle, 512);
 
-    public string Title => _title ??= CallWin32ToGetPWSTR(512, (p, l) => PInvoke.GetWindowText(_hWnd, p, l));
+    public string Title => _title ??= NativeMethods.GetWindowText(Handle, 512);
 
     public uint ProcessId => _pid is 0 ? (_pid = GetProcessIdCore()) : _pid;
 
@@ -44,27 +40,5 @@ public class Win32Window
         }
     }
 
-    private unsafe uint GetProcessIdCore()
-    {
-        uint pid = 0;
-        PInvoke.GetWindowThreadProcessId(_hWnd, &pid);
-        return pid;
-    }
-
-    private unsafe string CallWin32ToGetPWSTR(int bufferLength, Func<PWSTR, int, int> getter)
-    {
-        var buffer = ArrayPool<char>.Shared.Rent(bufferLength);
-        try
-        {
-            fixed (char* ptr = buffer)
-            {
-                getter(ptr, bufferLength);
-                return new string(ptr);
-            }
-        }
-        finally
-        {
-            ArrayPool<char>.Shared.Return(buffer);
-        }
-    }
+    private uint GetProcessIdCore() => NativeMethods.GetWindowThreadProcessId(Handle, out var pid) == 0 ? 0 : pid;
 }

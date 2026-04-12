@@ -1,6 +1,5 @@
 using UnlockFps.Logging;
 using UnlockFps.Utils;
-
 namespace UnlockFps;
 
 internal static class FpsPatterns
@@ -12,32 +11,41 @@ internal static class FpsPatterns
 
     public static unsafe nint ProvideAddress(NativeModuleInfo mainModule)
     {
-        using ModuleGuard mappedMainModule = NativeMethods.LoadLibraryEx(mainModule.FilePath, nint.Zero, LoadLibraryAsImageResource);
-        if (!mappedMainModule)
+        var mappedMainModule = NativeMethods.LoadLibraryEx(mainModule.FilePath, LoadLibraryAsImageResource);
+        if (mappedMainModule == IntPtr.Zero)
         {
             throw new InvalidOperationException($"Failed to map main module image: {mainModule.FilePath}");
         }
 
-        if (!ProcessUtils.TryGetSection(mappedMainModule.BaseAddress, Il2CppSectionName, out var il2cppSection))
+        try
         {
-            throw new InvalidOperationException($"Failed to find '{Il2CppSectionName}' section in {mainModule.FilePath}.");
+            if (!ProcessUtils.TryGetSection(mappedMainModule, Il2CppSectionName, out var il2cppSection))
+            {
+                throw new InvalidOperationException(
+                    $"Failed to find '{Il2CppSectionName}' section in {mainModule.FilePath}.");
+            }
+
+            var candidates = ProcessUtils.PatternScanAll(il2cppSection, FpsPattern);
+            Logger.LogDebug($"Found {candidates.Count} FPS pattern candidate(s) in {Il2CppSectionName}.");
+
+            foreach (var candidateAddress in candidates)
+            {
+                var localFpsAddress = TryResolveLocalFpsAddress((byte*)candidateAddress);
+                if (localFpsAddress == null)
+                    continue;
+
+                var localImageBase = (byte*)mappedMainModule;
+                var remoteImageBase = (byte*)mainModule.BaseAddress;
+                var remoteFpsAddress = remoteImageBase + (localFpsAddress - localImageBase);
+
+                Logger.LogDebug(
+                    $"Resolved FPS address: local=0x{(nint)localFpsAddress:X16}, remote=0x{(nint)remoteFpsAddress:X16}");
+                return (nint)remoteFpsAddress;
+            }
         }
-
-        var candidates = ProcessUtils.PatternScanAll(il2cppSection, FpsPattern);
-        Logger.LogDebug($"Found {candidates.Count} FPS pattern candidate(s) in {Il2CppSectionName}.");
-
-        foreach (var candidateAddress in candidates)
+        finally
         {
-            var localFpsAddress = TryResolveLocalFpsAddress((byte*)candidateAddress);
-            if (localFpsAddress == null)
-                continue;
-
-            var localImageBase = (byte*)mappedMainModule.BaseAddress;
-            var remoteImageBase = (byte*)mainModule.BaseAddress;
-            var remoteFpsAddress = remoteImageBase + (localFpsAddress - localImageBase);
-
-            Logger.LogDebug($"Resolved FPS address: local=0x{(nint)localFpsAddress:X16}, remote=0x{(nint)remoteFpsAddress:X16}");
-            return (nint)remoteFpsAddress;
+            NativeMethods.FreeLibrary(mappedMainModule);
         }
 
         throw new InvalidOperationException("Unrecognized FPS pattern.");
@@ -72,7 +80,8 @@ internal static class FpsPatterns
         return instruction + displacement + 5;
     }
 
-    private static unsafe byte* ResolveRipRelativeAddress(byte* instruction, int displacementOffset, int instructionSize)
+    private static unsafe byte* ResolveRipRelativeAddress(byte* instruction, int displacementOffset,
+        int instructionSize)
     {
         var displacement = *(int*)(instruction + displacementOffset);
         return instruction + displacement + instructionSize;

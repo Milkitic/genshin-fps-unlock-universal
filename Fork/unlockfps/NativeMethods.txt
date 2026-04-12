@@ -1,4 +1,4 @@
-﻿CreateProcess
+CreateProcess
 DispatchMessage
 GetClassName
 GetForegroundWindow
@@ -18,3 +18,30 @@ OpenProcess
 QueryFullProcessImageName
 
 EnumWindows
+LoadLibraryEx
+ReadProcessMemory
+WriteProcessMemory
+CloseHandle
+CreateRemoteThread
+AllocConsole
+DeleteMenu
+FreeConsole
+GetConsoleWindow
+GetSystemMenu
+SetConsoleCtrlHandler
+FreeLibrary
+GetExitCodeProcess
+GetProcAddress
+K32EnumProcessModulesEx
+K32EnumProcesses
+K32GetModuleBaseName
+K32GetModuleFileNameEx
+K32GetModuleInformation
+LoadLibrary
+OpenProcess
+QueryFullProcessImageName
+SetPriorityClass
+TerminateProcess
+VirtualAllocEx
+VirtualFreeEx
+WaitForSingleObject

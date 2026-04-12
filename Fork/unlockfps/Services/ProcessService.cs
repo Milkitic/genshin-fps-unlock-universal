@@ -1,5 +1,6 @@
 using System.Buffers;
 using System.ComponentModel;
+using Microsoft.Win32.SafeHandles;
 using System.Runtime.InteropServices;
 using System.Runtime.Versioning;
 using System.Text;
@@ -7,7 +8,6 @@ using UnlockFps.Logging;
 using UnlockFps.Utils;
 using Windows.Win32.System.Threading;
 
-using static Windows.Win32.PInvoke;
 using PROCESS_INFORMATION = Windows.Win32.System.Threading.PROCESS_INFORMATION;
 
 namespace UnlockFps.Services;
@@ -48,7 +48,7 @@ public class ProcessService
 
         if (launchOptions.SuspendLoad)
         {
-            var retCode = ResumeThread(lpProcessInformation.hThread);
+            var retCode = NativeMethods.ResumeThread(lpProcessInformation.hThread);
             if (retCode == 0xFFFFFFFF)
             {
                 throw new Win32Exception(Marshal.GetLastWin32Error(),
@@ -59,7 +59,8 @@ public class ProcessService
         _lastProcessId = (int)lpProcessInformation.dwProcessId;
     }
 
-    private static unsafe IDisposable CreateProcessRaw(LaunchOptions launchOptions, out PROCESS_INFORMATION lpProcessInformation)
+    private static unsafe SafeWaitHandle CreateProcessRaw(LaunchOptions launchOptions,
+        out PROCESS_INFORMATION lpProcessInformation)
     {
         var lpCurrentDirectory = Path.GetDirectoryName(launchOptions.GamePath);
         var commandLine = BuildCommandLine(launchOptions);
@@ -73,10 +74,8 @@ public class ProcessService
             commandLine.CopyTo(lpCommandLine);
             lpCommandLine[^1] = '\0';
 
-            if (!CreateProcess(launchOptions.GamePath, ref lpCommandLine,
-                    default, default, false,
-                    dwCreationFlags, default, lpCurrentDirectory,
-                    in lpStartupInfo, out lpProcessInformation))
+            if (!NativeMethods.CreateProcess(launchOptions.GamePath, ref lpCommandLine, dwCreationFlags,
+                    lpCurrentDirectory, in lpStartupInfo, out lpProcessInformation))
             {
                 throw new Win32Exception(Marshal.GetLastWin32Error(),
                     $"CreateProcess failed. ({Marshal.GetLastPInvokeErrorMessage()})");
@@ -87,7 +86,7 @@ public class ProcessService
             ArrayPool<char>.Shared.Return(array);
         }
 
-        return new ThreadGuard(lpProcessInformation.hThread);
+        return new SafeWaitHandle(lpProcessInformation.hThread, ownsHandle: true);
     }
 
     private static string BuildCommandLine(LaunchOptions launchOptions)

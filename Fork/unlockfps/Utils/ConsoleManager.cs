@@ -1,5 +1,4 @@
-﻿using System.Diagnostics;
-using System.Runtime.InteropServices;
+using System.Diagnostics;
 using System.Security;
 
 namespace UnlockFps.Utils;
@@ -27,37 +26,11 @@ internal static class ConsoleManager
         COMMON_LVB_UNDERSCORE = 0x8000
     }
     
-    private static ConsoleEventDelegate? _handler;
-    private delegate bool ConsoleEventDelegate(int eventType);
-    public static bool HasConsole => GetConsoleWindow() != IntPtr.Zero;
-
-    private const string Kernel32_DllName = "kernel32";
-
-    [DllImport(Kernel32_DllName)]
-    private static extern bool AllocConsole();
-
-    [DllImport(Kernel32_DllName)]
-    private static extern bool FreeConsole();
-
-    [DllImport(Kernel32_DllName)]
-    private static extern IntPtr GetConsoleWindow();
-
-    [DllImport(Kernel32_DllName)]
-    private static extern int GetConsoleOutputCP();
-    [DllImport(Kernel32_DllName)]
-    private static extern int SetConsoleTextAttribute(IntPtr hConsoleOutput,
-        CharacterAttributes wAttributes);
-    [DllImport(Kernel32_DllName, SetLastError = true)]
-    private static extern bool SetConsoleCtrlHandler(ConsoleEventDelegate callback, bool add);
+    private static NativeMethods.ConsoleControlHandler? _handler;
+    public static bool HasConsole => NativeMethods.GetConsoleWindow() != IntPtr.Zero;
 
     private const int MF_BYCOMMAND = 0x00000000;
     public const int SC_CLOSE = 0xF060;
-
-    [DllImport("user32.dll")]
-    public static extern int DeleteMenu(IntPtr hMenu, int nPosition, int wFlags);
-
-    [DllImport("user32.dll")]
-    private static extern IntPtr GetSystemMenu(IntPtr hWnd, bool bRevert);
 
     /// <summary>
     /// Creates a new console instance if the process is not attached to a console already.
@@ -65,7 +38,7 @@ internal static class ConsoleManager
     public static void Show()
     {
         if (HasConsole) return;
-        AllocConsole();
+        NativeMethods.AllocConsole();
         //var intPtr = GetConsoleWindow();
         //SetConsoleTextAttribute(intPtr,
         //    CharacterAttributes.BACKGROUND_INTENSITY | CharacterAttributes.FOREGROUND_INTENSITY);
@@ -75,8 +48,8 @@ internal static class ConsoleManager
         Console.ForegroundColor = ConsoleColor.Yellow;
         Console.WriteLine("Note: Closing this window will lead to program exiting.");
         Console.ResetColor();
-        var hMenu = GetSystemMenu(GetConsoleWindow(), false);
-        DeleteMenu(hMenu, SC_CLOSE, MF_BYCOMMAND);
+        var hMenu = NativeMethods.GetSystemMenu(NativeMethods.GetConsoleWindow(), false);
+        NativeMethods.DeleteMenu(hMenu, SC_CLOSE, MF_BYCOMMAND);
     }
 
     public static void BindExitAction(Action? exitAction)
@@ -89,7 +62,7 @@ internal static class ConsoleManager
             return true;
         };
 
-        SetConsoleCtrlHandler(_handler, true);
+        NativeMethods.SetConsoleCtrlHandler(_handler, true);
     }
 
     /// <summary>
@@ -99,7 +72,7 @@ internal static class ConsoleManager
     {
         if (!HasConsole) return;
         SetOutAndErrorNull();
-        FreeConsole();
+        NativeMethods.FreeConsole();
     }
 
     //public static void Toggle()

@@ -22,7 +22,7 @@ internal sealed class NativeProcess : IDisposable
     {
         get
         {
-            if (!Native.GetExitCodeProcess(Handle, out var exitCode))
+            if (!NativeMethods.GetExitCodeProcess(Handle, out var exitCode))
                 return true;
 
             return exitCode != ProcessExitCode.STILL_ACTIVE;
@@ -35,7 +35,7 @@ internal sealed class NativeProcess : IDisposable
         if (pid == 0)
             return false;
 
-        var handle = Native.OpenProcess(desiredAccess, false, pid);
+        var handle = NativeMethods.OpenProcess(desiredAccess, false, pid);
         if (handle == nint.Zero)
             return false;
 
@@ -96,7 +96,7 @@ internal sealed class NativeProcess : IDisposable
             return true;
 
         var handles = new nint[1024];
-        if (!Native.EnumProcessModulesEx(Handle, handles, (uint)(handles.Length * nint.Size), out var bytesNeeded, 0x03))
+        if (!NativeMethods.EnumProcessModulesEx(Handle, handles, (uint)(handles.Length * nint.Size), out var bytesNeeded, 0x03))
         {
             return false;
         }
@@ -109,7 +109,8 @@ internal sealed class NativeProcess : IDisposable
                 continue;
 
             StringBuilder moduleNameBuilder = new StringBuilder(1024);
-            if (Native.GetModuleBaseName(Handle, moduleHandle, moduleNameBuilder, (uint)moduleNameBuilder.Capacity) == 0)
+            if (NativeMethods.GetModuleBaseName(Handle, moduleHandle, moduleNameBuilder,
+                    (uint)moduleNameBuilder.Capacity) == 0)
                 continue;
 
             var foundName = moduleNameBuilder.ToString();
@@ -117,10 +118,12 @@ internal sealed class NativeProcess : IDisposable
                 continue;
 
             StringBuilder fileNameBuilder = new StringBuilder(1024);
-            if (Native.GetModuleFileNameEx(Handle, moduleHandle, fileNameBuilder, (uint)fileNameBuilder.Capacity) == 0)
+            if (NativeMethods.GetModuleFileNameEx(Handle, moduleHandle, fileNameBuilder,
+                    (uint)fileNameBuilder.Capacity) == 0)
                 continue;
 
-            if (!Native.GetModuleInformation(Handle, moduleHandle, out var moduleInfo, (uint)Marshal.SizeOf<MODULEINFO>()))
+            if (!NativeMethods.GetModuleInformation(Handle, moduleHandle, out var moduleInfo,
+                    (uint)Marshal.SizeOf<MODULEINFO>()))
                 continue;
 
             modules[foundName] = new NativeModuleInfo
@@ -140,19 +143,19 @@ internal sealed class NativeProcess : IDisposable
 
     public bool TrySetPriorityClass(uint priorityClass)
     {
-        return Native.SetPriorityClass(Handle, priorityClass);
+        return NativeMethods.SetPriorityClass(Handle, priorityClass);
     }
 
     public bool TryTerminate(uint exitCode = 0)
     {
-        return Native.TerminateProcess(Handle, exitCode);
+        return NativeMethods.TerminateProcess(Handle, exitCode);
     }
 
     public void Dispose()
     {
         if (Handle != nint.Zero)
         {
-            Native.CloseHandle(Handle);
+            NativeMethods.CloseHandle(Handle);
         }
     }
 }
