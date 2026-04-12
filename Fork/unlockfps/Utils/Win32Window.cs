@@ -1,8 +1,8 @@
-﻿using System.Buffers;
+using System.Buffers;
 using System.Runtime.Versioning;
 using Windows.Win32;
 using Windows.Win32.Foundation;
-using Windows.Win32.System.Threading;
+using UnlockFps.Gui.Utils;
 
 namespace UnlockFps.Utils;
 
@@ -29,38 +29,16 @@ public class Win32Window
     public uint ProcessId => _pid is 0 ? (_pid = GetProcessIdCore()) : _pid;
 
     //public string ProcessName => _processName ??= Process.GetProcessById((int)ProcessId).ProcessName;
-    public unsafe string ProcessName
+    public string ProcessName
     {
         get
         {
             if (_processName == null)
             {
-                var hProcess =
-                    PInvoke.OpenProcess(
-                        PROCESS_ACCESS_RIGHTS.PROCESS_QUERY_LIMITED_INFORMATION |
-                        PROCESS_ACCESS_RIGHTS.PROCESS_TERMINATE | PROCESS_ACCESS_RIGHTS.PROCESS_SYNCHRONIZE, false,
-                        ProcessId);
-                try
-                {
-                    uint bufferSize = 512;
-                    Span<char> span = stackalloc char[(int)bufferSize];
+                if (!ProcessUtils.TryGetProcessPath(ProcessId, out var processPath))
+                    return "";
 
-                    fixed (char* o = span)
-                    {
-                        if (!PInvoke.QueryFullProcessImageName(hProcess, 0, new PWSTR(o), &bufferSize))
-                        {
-                            return "";
-                        }
-                    }
-
-                    var path = new string(span.Slice(0, (int)bufferSize));
-                    var processName = Path.GetFileNameWithoutExtension(path);
-                    _processName = processName;
-                }
-                finally
-                {
-                    PInvoke.CloseHandle(hProcess);
-                }
+                _processName = Path.GetFileNameWithoutExtension(processPath);
             }
 
             return _processName;

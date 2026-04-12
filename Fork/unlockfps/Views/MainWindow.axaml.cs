@@ -17,6 +17,7 @@ using UnlockFps.Gui.Utils;
 using UnlockFps.Gui.ViewModels;
 using UnlockFps.Gui.Views;
 using UnlockFps.Services;
+using UnlockFps.Utils;
 
 namespace UnlockFps.Gui.ViewModels
 {

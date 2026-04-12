@@ -5,24 +5,110 @@ namespace UnlockFps.Utils;
 
 internal class ProcessUtils
 {
-    public static string GetProcessPathFromPid(uint pid, out nint processHandle)
+    public static string GetProcessPath(nint processHandle)
     {
-        var hProcess = Native.OpenProcess(
-            ProcessAccess.QUERY_LIMITED_INFORMATION |
-            ProcessAccess.TERMINATE |
-            StandardAccess.SYNCHRONIZE, false, pid);
-
-        processHandle = hProcess;
-
-        if (hProcess == nint.Zero)
+        if (processHandle == nint.Zero)
             return string.Empty;
 
         StringBuilder sb = new StringBuilder(1024);
         uint bufferSize = (uint)sb.Capacity;
-        if (!Native.QueryFullProcessImageName(hProcess, 0, sb, ref bufferSize))
+        if (!Native.QueryFullProcessImageName(processHandle, 0, sb, ref bufferSize))
             return string.Empty;
 
         return sb.ToString();
+    }
+
+    public static string GetProcessPathFromPid(uint pid, out nint processHandle)
+    {
+        processHandle = Native.OpenProcess(ProcessAccess.QUERY_LIMITED_INFORMATION, false, pid);
+        return GetProcessPath(processHandle);
+    }
+
+    public static bool TryGetProcessPath(uint pid, out string? processPath)
+    {
+        var path = GetProcessPathFromPid(pid, out var processHandle);
+        try
+        {
+            if (string.IsNullOrEmpty(path))
+            {
+                processPath = null;
+                return false;
+            }
+
+            processPath = path;
+            return true;
+        }
+        finally
+        {
+            if (processHandle != nint.Zero)
+            {
+                Native.CloseHandle(processHandle);
+            }
+        }
+    }
+
+    public static bool IsGamePath(string? processPath)
+    {
+        if (string.IsNullOrWhiteSpace(processPath))
+            return false;
+
+        var processName = Path.GetFileNameWithoutExtension(processPath);
+        return Array.IndexOf(GameConstants.GameNames, processName) != -1;
+    }
+
+    public static bool TryFindRunningGameProcessId(out uint pid)
+    {
+        pid = 0;
+
+        var processIds = new uint[2048];
+        if (!Native.EnumProcesses(processIds, (uint)(processIds.Length * sizeof(uint)), out var bytesNeeded))
+            return false;
+
+        var count = (int)(bytesNeeded / sizeof(uint));
+        for (var i = 0; i < count && i < processIds.Length; i++)
+        {
+            var currentPid = processIds[i];
+            if (!TryGetProcessPath(currentPid, out var processPath) || !IsGamePath(processPath))
+                continue;
+
+            pid = currentPid;
+            return true;
+        }
+
+        return false;
+    }
+
+    public static bool TryGetGameProcessFromPid(uint pid, out string processPath, out nint processHandle)
+    {
+        processPath = GetProcessPathFromPid(pid, out var queryHandle);
+        try
+        {
+            if (string.IsNullOrEmpty(processPath) || !IsGamePath(processPath))
+            {
+                processPath = string.Empty;
+                processHandle = nint.Zero;
+                return false;
+            }
+        }
+        finally
+        {
+            if (queryHandle != nint.Zero)
+            {
+                Native.CloseHandle(queryHandle);
+            }
+        }
+
+        processHandle = Native.OpenProcess(
+            ProcessAccess.QUERY_LIMITED_INFORMATION |
+            ProcessAccess.TERMINATE |
+            StandardAccess.SYNCHRONIZE, false, pid);
+        if (processHandle == nint.Zero)
+        {
+            processPath = string.Empty;
+            return false;
+        }
+
+        return true;
     }
 
     public static bool InjectDlls(nint processHandle, IReadOnlyList<string> dllPaths)

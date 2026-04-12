@@ -1,6 +1,5 @@
-﻿using System.Buffers;
+using System.Buffers;
 using System.ComponentModel;
-using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Runtime.Versioning;
 using System.Text;
@@ -33,12 +32,9 @@ public class ProcessService
             throw new PlatformNotSupportedException("Only windows or wine is supported.");
         }
 
-        var runningProcess = Process.GetProcesses()
-            .FirstOrDefault(x => Array.IndexOf(GameConstants.GameNames, x.ProcessName) != -1);
-
-        if (runningProcess is not null)
+        if (ProcessUtils.TryFindRunningGameProcessId(out var runningProcessId))
         {
-            throw new Exception("An instance of the game is already running: " + runningProcess.Id);
+            throw new Exception("An instance of the game is already running: " + runningProcessId);
         }
 
         var launchOptions = _config.LaunchOptions;
@@ -127,10 +123,17 @@ public class ProcessService
     {
         try
         {
-            var process = Process.GetProcessById(_lastProcessId);
-            if (Array.IndexOf(GameConstants.GameNames, process.ProcessName) != -1)
+            if (!NativeProcess.TryOpen((uint)_lastProcessId,
+                    ProcessAccess.TERMINATE | ProcessAccess.QUERY_LIMITED_INFORMATION | StandardAccess.SYNCHRONIZE,
+                    out var process))
+                return;
+
+            using (process)
             {
-                process.Kill();
+                if (!process.TryGetImagePath(out var imagePath) || !ProcessUtils.IsGamePath(imagePath))
+                    return;
+
+                process.TryTerminate();
             }
         }
         catch (Exception ex)

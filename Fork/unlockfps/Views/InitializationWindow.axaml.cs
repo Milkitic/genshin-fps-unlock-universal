@@ -1,18 +1,12 @@
-﻿using System;
 using System.Collections.ObjectModel;
 using System.Globalization;
-using System.IO;
-using System.Linq;
 using System.Text;
-using System.Threading;
-using System.Threading.Tasks;
 using Avalonia.Controls;
 using Avalonia.Interactivity;
 using Avalonia.Platform.Storage;
 using Avalonia.Threading;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Win32;
-using UnlockFps.Gui.Utils;
 using UnlockFps.Gui.ViewModels;
 using UnlockFps.Services;
 using UnlockFps.Utils;
@@ -102,7 +96,7 @@ namespace UnlockFps.Gui.Views
             });
         }
 
-        private async ValueTask<bool> FindWindowAsync()
+        private ValueTask<bool> FindWindowAsync()
         {
             IntPtr windowHandle = IntPtr.Zero;
             IntPtr processHandle = IntPtr.Zero;
@@ -113,34 +107,25 @@ namespace UnlockFps.Gui.Views
                 var win32Window = new Win32Window(hWnd);
                 if (win32Window.ClassName != "UnityWndClass") return true;
 
-                windowHandle = hWnd;
                 var err = Native.GetWindowThreadProcessId(hWnd, out var pid);
                 if (err == 0) return true;
 
-                processPath = ProcessUtils.GetProcessPathFromPid(pid, out processHandle);
+                if (!ProcessUtils.TryGetGameProcessFromPid(pid, out processPath, out processHandle))
+                    return true;
+
+                windowHandle = hWnd;
                 return false;
             }, IntPtr.Zero);
 
             if (windowHandle == IntPtr.Zero)
-                return false;
-
-            if (string.IsNullOrEmpty(processPath))
-            {
-                var alertWindow = App.DefaultServices.GetRequiredService<AlertWindow>();
-                alertWindow.Text = """
-                                   Failed to find process path.
-                                   Please use "Browse" instead.
-                                   """;
-                await alertWindow.ShowDialog(this);
-                return false;
-            }
+                return ValueTask.FromResult(false);
 
             Native.TerminateProcess(processHandle, 0);
             Native.CloseHandle(processHandle);
 
             _configService.Config.LaunchOptions.GamePath = Path.GetFullPath(processPath);
             _configService.Save();
-            return true;
+            return ValueTask.FromResult(true);
         }
 
 #pragma warning disable CA1416

@@ -1,4 +1,4 @@
-﻿using System.ComponentModel;
+using System.ComponentModel;
 using System.Runtime.InteropServices;
 using System.Text;
 
@@ -85,10 +85,19 @@ internal class Native
     public static extern bool SetPriorityClass(IntPtr hProcess, uint dwPriorityClass);
 
     [DllImport("psapi.dll", SetLastError = true)]
+    public static extern bool EnumProcesses([Out] uint[] lpidProcess, uint cb, out uint lpcbNeeded);
+
+    [DllImport("psapi.dll", SetLastError = true)]
     public static extern bool EnumProcessModules(IntPtr hProcess, [Out] IntPtr[] lphModule, uint cb, out uint lpcbNeeded);
+
+    [DllImport("psapi.dll", SetLastError = true)]
+    public static extern bool EnumProcessModulesEx(IntPtr hProcess, [Out] IntPtr[] lphModule, uint cb, out uint lpcbNeeded, uint dwFilterFlag);
 
     [DllImport("psapi.dll", CharSet = CharSet.Unicode, SetLastError = true)]
     public static extern uint GetModuleBaseName(IntPtr hProcess, IntPtr hModule, StringBuilder lpBaseName, uint nSize);
+
+    [DllImport("psapi.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+    public static extern uint GetModuleFileNameEx(IntPtr hProcess, IntPtr hModule, StringBuilder lpFilename, uint nSize);
 
     [DllImport("psapi.dll", CharSet = CharSet.Unicode, SetLastError = true)]
     public static extern bool GetModuleInformation(IntPtr hProcess, IntPtr hModule, out MODULEINFO lpmodinfo, uint cb);
@@ -194,6 +203,21 @@ internal static class MemoryProtection
     public const uint READONLY = 0x02;
     public const uint READWRITE = 0x04;
     public const uint WRITECOPY = 0x08;
+}
+
+internal static class PriorityClass
+{
+    public const uint ABOVE_NORMAL = 0x00008000;
+    public const uint BELOW_NORMAL = 0x00004000;
+    public const uint HIGH = 0x00000080;
+    public const uint IDLE = 0x00000040;
+    public const uint NORMAL = 0x00000020;
+    public const uint REALTIME = 0x00000100;
+}
+
+internal static class ProcessExitCode
+{
+    public const uint STILL_ACTIVE = 259;
 }
 
 [StructLayout(LayoutKind.Sequential)]

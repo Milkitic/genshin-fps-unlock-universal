@@ -1,5 +1,4 @@
-﻿using System.ComponentModel;
-using System.Diagnostics;
+using System.ComponentModel;
 using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
 using System.Runtime.Versioning;
@@ -15,22 +14,31 @@ namespace UnlockFps.Services;
 [SupportedOSPlatform("windows5.0")]
 public class GameInstanceService : IDisposable, INotifyPropertyChanged
 {
-    public event Action<Process>? ProcessExit;
+    public event Action<uint>? ProcessExit;
 
     private static readonly ILogger Logger = LogManager.GetLogger(nameof(GameInstanceService));
+    private static readonly string[] RequiredModules = ["UnityPlayer.dll", "UserAssembly.dll"];
+    private const uint MonitoringProcessAccess =
+        ProcessAccess.QUERY_INFORMATION |
+        ProcessAccess.QUERY_LIMITED_INFORMATION |
+        ProcessAccess.SET_INFORMATION |
+        ProcessAccess.VM_OPERATION |
+        ProcessAccess.VM_READ |
+        ProcessAccess.VM_WRITE |
+        StandardAccess.SYNCHRONIZE;
 
     private readonly Config _config;
 
     private HWINEVENTHOOK _winEventHook;
 
-    private static readonly ProcessPriorityClass[] PriorityClass =
+    private static readonly uint[] PriorityClasses =
     [
-        ProcessPriorityClass.RealTime,
-        ProcessPriorityClass.High,
-        ProcessPriorityClass.AboveNormal,
-        ProcessPriorityClass.Normal,
-        ProcessPriorityClass.BelowNormal,
-        ProcessPriorityClass.Idle
+        PriorityClass.REALTIME,
+        PriorityClass.HIGH,
+        PriorityClass.ABOVE_NORMAL,
+        PriorityClass.NORMAL,
+        PriorityClass.BELOW_NORMAL,
+        PriorityClass.IDLE
     ];
 
     private SynchronizationContext? _hwndSynchronizationContext;
@@ -185,8 +193,7 @@ public class GameInstanceService : IDisposable, INotifyPropertyChanged
 
         var text =
             $"[0x{win32Window.Handle:X16} {win32Window.ClassName}] ({win32Window.ProcessId} {win32Window.ProcessName}.exe) {win32Window.Title}";
-        var process = Process.GetProcessById((int)win32Window.ProcessId);
-        if (!CheckProcess(process, out var processContext))
+        if (!CheckProcess(win32Window.ProcessId, out var processContext))
         {
             Logger.LogDebug($"Invalid window: {text}");
             return;
@@ -210,7 +217,7 @@ public class GameInstanceService : IDisposable, INotifyPropertyChanged
     {
         while (!token.IsCancellationRequested)
         {
-            if (Context is not { CurrentProcess.HasExited: false } processContext) break;
+            if (Context is not { NativeProcess.HasExited: false } processContext) break;
 
             ApplyFpsLimit(processContext);
             if (!TaskUtils.TaskSleep(200, token)) return;
@@ -218,12 +225,12 @@ public class GameInstanceService : IDisposable, INotifyPropertyChanged
 
         if (Context != null)
         {
-            if (Context.CurrentProcess.HasExited && Context.Win32Window != null)
+            if (Context.NativeProcess.HasExited && Context.Win32Window != null)
             {
                 Logger.LogInformation($"Process exit: {Context.Win32Window.ProcessName}");
             }
 
-            ProcessExit?.Invoke(Context.CurrentProcess);
+            ProcessExit?.Invoke(Context.NativeProcess.Pid);
             Context.Dispose();
             Context = null;
         }
@@ -231,15 +238,21 @@ public class GameInstanceService : IDisposable, INotifyPropertyChanged
         Logger.LogInformation("Stop applying FPS.");
     }
 
-    private bool CheckProcess(Process process, [NotNullWhen(true)] out ProcessContext? processContext)
+    private bool CheckProcess(uint pid, [NotNullWhen(true)] out ProcessContext? processContext)
     {
         processContext = null;
-        if (!CheckProcessPath(process, out var fileName, out var directoryName)) return false;
-        if (process.HasExited) return false;
+        if (!NativeProcess.TryOpen(pid, MonitoringProcessAccess, out var nativeProcess))
+            return false;
+
+        if (!CheckProcessPath(nativeProcess, out var fileName, out var directoryName) || nativeProcess.HasExited)
+        {
+            nativeProcess.Dispose();
+            return false;
+        }
 
         Context = processContext = new ProcessContext
         {
-            CurrentProcess = process,
+            NativeProcess = nativeProcess,
             FileName = fileName,
             DirectoryName = directoryName
         };
@@ -252,57 +265,60 @@ public class GameInstanceService : IDisposable, INotifyPropertyChanged
 
             Logger.LogInformation($"Trying to get FPS address...");
             processContext.FpsValueAddress = FpsPatterns.ProvideAddress(Context.UnityPlayerModule,
-                processContext.UserAssemblyModule, process);
+                processContext.UserAssemblyModule, nativeProcess.Handle);
             Logger.LogInformation($"Get FPS address successfully: {processContext.FpsValueAddress}");
             return true;
         }
         catch
         {
+            Context?.Dispose();
             Context = processContext = null;
             throw;
         }
     }
 
-    private static bool CheckProcessPath(Process process,
+    private static bool CheckProcessPath(NativeProcess process,
         [NotNullWhen(true)] out string? fileName,
         [NotNullWhen(true)] out string? directoryName)
     {
-        if (process.MainModule != null)
+        if (!process.TryGetImagePath(out var processPath) ||
+            !ProcessUtils.IsGamePath(processPath))
         {
-            fileName = process.MainModule.FileName;
-            directoryName = Path.GetDirectoryName(fileName)!;
-            if (File.Exists(Path.Combine(directoryName, "UnityPlayer.dll")))
-            {
-                return true;
-            }
-
+            fileName = null;
+            directoryName = null;
             return false;
         }
 
-        fileName = null;
-        directoryName = null;
-        return false;
+        var gameDirectory = Path.GetDirectoryName(processPath);
+        if (string.IsNullOrEmpty(gameDirectory) ||
+            !File.Exists(Path.Combine(gameDirectory, "UnityPlayer.dll")))
+        {
+            fileName = null;
+            directoryName = null;
+            return false;
+        }
+
+        fileName = processPath;
+        directoryName = gameDirectory;
+        return true;
     }
 
     private bool GetProcessModules(ProcessContext processContext, CancellationToken token)
     {
         int retryCount = 0;
 
-        while (processContext.CurrentProcess is { HasExited: false } currentProcess && !token.IsCancellationRequested)
+        while (!processContext.NativeProcess.HasExited && !token.IsCancellationRequested)
         {
-            currentProcess.Refresh();
-            var modules = currentProcess.Modules.Cast<ProcessModule>()
-                .Where(k => k.ModuleName is "UnityPlayer.dll" or "UserAssembly.dll");
-
-            foreach (var processModule in modules)
+            if (processContext.NativeProcess.TryGetModules(RequiredModules, out var modules))
             {
-                if (processModule.ModuleName is "UnityPlayer.dll")
+                if (modules.TryGetValue("UnityPlayer.dll", out var unityPlayerModule))
                 {
-                    processContext.UnityPlayerModule = processModule;
+                    processContext.UnityPlayerModule = unityPlayerModule;
                 }
-                else if (processModule.ModuleName is "UserAssembly.dll")
+
+                if (modules.TryGetValue("UserAssembly.dll", out var userAssemblyModule))
                 {
-                    processContext.UserAssemblyModule = processModule;
+                    processContext.UserAssemblyModule = userAssemblyModule;
                 }
             }
 
@@ -327,7 +343,7 @@ public class GameInstanceService : IDisposable, INotifyPropertyChanged
     private void ApplyFpsLimit(ProcessContext context)
     {
         var isGameForegroundOld = context.IsGameInForeground;
-        context.IsGameInForeground = GetForegroundWindow() == context.CurrentProcess.MainWindowHandle;
+        context.IsGameInForeground = context.Win32Window != null && GetForegroundWindow() == context.Win32Window.Handle;
         if (context.IsGameInForeground != isGameForegroundOld)
         {
             var activeStr = context.IsGameInForeground ? "active" : "inactive";
@@ -336,9 +352,10 @@ public class GameInstanceService : IDisposable, INotifyPropertyChanged
 
         if (_config.UsePowerSave)
         {
-            context.CurrentProcess.PriorityClass = context.IsGameInForeground
-                ? PriorityClass[_config.ProcessPriority]
-                : ProcessPriorityClass.Idle;
+            var priorityClass = context.IsGameInForeground
+                ? PriorityClasses[_config.ProcessPriority]
+                : PriorityClass.IDLE;
+            context.NativeProcess.TrySetPriorityClass(priorityClass);
         }
 
         int fpsTarget;
@@ -352,7 +369,7 @@ public class GameInstanceService : IDisposable, INotifyPropertyChanged
         }
 
         Span<byte> buffer = stackalloc byte[4];
-        var readProcessMemory = NativeMethods.ReadProcessMemory(context.CurrentProcess.Handle, context.FpsValueAddress,
+        var readProcessMemory = NativeMethods.ReadProcessMemory(context.NativeProcess.Handle, context.FpsValueAddress,
             buffer, 4, out var readBytes);
         if (!readProcessMemory || readBytes != 4) return;
 
@@ -360,7 +377,7 @@ public class GameInstanceService : IDisposable, INotifyPropertyChanged
         if (currentFps == fpsTarget) return;
 
         var toWrite = BitConverter.GetBytes(fpsTarget);
-        if (NativeMethods.WriteProcessMemory(context.CurrentProcess.Handle, context.FpsValueAddress, toWrite, 4, out _))
+        if (NativeMethods.WriteProcessMemory(context.NativeProcess.Handle, context.FpsValueAddress, toWrite, 4, out _))
         {
             Logger.LogInformation($"FPS Override: {currentFps} -> {fpsTarget}");
         }
@@ -395,13 +412,12 @@ public class GameInstanceService : IDisposable, INotifyPropertyChanged
 
         public CancellationTokenSource CancellationTokenSource { get; }
 
-        public required Process CurrentProcess { get; init; }
-        //public required IntPtr ProcessHandle { get; init; }
+        public required NativeProcess NativeProcess { get; init; }
         public required string FileName { get; init; }
         public required string DirectoryName { get; init; }
 
-        public ProcessModule UnityPlayerModule { get; set; } = null!;
-        public ProcessModule UserAssemblyModule { get; set; } = null!;
+        public NativeModuleInfo UnityPlayerModule { get; set; } = null!;
+        public NativeModuleInfo UserAssemblyModule { get; set; } = null!;
         public bool IsFpsApplied { get; set; }
 
         public IntPtr FpsValueAddress { get; set; }
@@ -412,7 +428,7 @@ public class GameInstanceService : IDisposable, INotifyPropertyChanged
         public void Dispose()
         {
             CancellationTokenSource.Dispose();
-            CurrentProcess?.Dispose();
+            NativeProcess.Dispose();
         }
     }
 }

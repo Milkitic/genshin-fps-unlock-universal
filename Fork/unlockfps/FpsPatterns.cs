@@ -1,4 +1,3 @@
-﻿using System.Diagnostics;
 using System.Runtime.InteropServices;
 using UnlockFps.Logging;
 using UnlockFps.Utils;
@@ -9,10 +8,10 @@ internal static class FpsPatterns
 {
     private static readonly ILogger Logger = LogManager.GetLogger(nameof(FpsPatterns));
 
-    public static unsafe nint ProvideAddress(ProcessModule mdUnityPlayer, ProcessModule mdUserAssembly, Process process)
+    public static unsafe nint ProvideAddress(NativeModuleInfo mdUnityPlayer, NativeModuleInfo mdUserAssembly, nint processHandle)
     {
-        var unityPlayerPath = mdUnityPlayer.FileName;
-        var userAssemblyPath = mdUserAssembly.FileName;
+        var unityPlayerPath = mdUnityPlayer.FilePath;
+        var userAssemblyPath = mdUserAssembly.FilePath;
 
         using ModuleGuard shUnityPlayer = Utils.NativeMethods.LoadLibraryEx(unityPlayerPath, nint.Zero, 0x20);
         using ModuleGuard shUserAssembly = Utils.NativeMethods.LoadLibraryEx(userAssemblyPath, nint.Zero, 0x20);
@@ -73,7 +72,7 @@ internal static class FpsPatterns
             Span<byte> readResult = stackalloc byte[8];
             while (dataPtr == null)
             {
-                Utils.NativeMethods.ReadProcessMemory(process.Handle, (nint)remoteVa, readResult, readResult.Length, out _);
+                Utils.NativeMethods.ReadProcessMemory(processHandle, (nint)remoteVa, readResult, readResult.Length, out _);
                 ulong value = BitConverter.ToUInt64(readResult);
                 dataPtr = (byte*)value;
             }

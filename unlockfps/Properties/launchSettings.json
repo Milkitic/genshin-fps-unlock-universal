@@ -1,8 +1,0 @@
-{
-  "profiles": {
-    "unlockfps": {
-      "commandName": "Project",
-      "commandLineArgs": "-m"
-    }
-  }
-}

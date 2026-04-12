@@ -1,7 +1,5 @@
-﻿using System;
-using System.Threading;
-using Avalonia;
-using UnlockFps.Gui.Utils;
+﻿using Avalonia;
+using UnlockFps.Utils;
 
 namespace UnlockFps.Gui;
 
