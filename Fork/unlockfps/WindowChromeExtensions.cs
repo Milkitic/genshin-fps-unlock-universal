@@ -1,10 +1,7 @@
-using System.Runtime.InteropServices;
 using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
 using Avalonia.Media;
 using Avalonia.Platform;
-using UnlockFps.OSVersionExt;
-using OperatingSystem = UnlockFps.OSVersionExt.OperatingSystem;
 
 namespace UnlockFps;
 
@@ -58,24 +55,25 @@ public static class WindowChromeExtensions
         await Task.Delay(1);
         var platformColorValues = platformSettings ?? window.PlatformSettings?.GetColorValues();
         var isDark = platformColorValues?.ThemeVariant == PlatformThemeVariant.Dark;
-        if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows)) return;
+        if (!OperatingSystem.IsWindows()) return;
 
-        var version = OSVersion.GetOperatingSystem();
+        var isWindows11OrLater = OperatingSystem.IsWindowsVersionAtLeast(10, 0, 22000);
+        var isWindows10OrLater = !isWindows11OrLater && OperatingSystem.IsWindowsVersionAtLeast(10);
         if (window.IsActive)
         {
-            if (version is OperatingSystem.Windows11)
+            if (isWindows11OrLater)
             {
                 window.Background = isDark
                     ? SolidColorBrush.Parse("#80202020")
                     : SolidColorBrush.Parse("#DDF3F3F3");
-                window.TransparencyLevelHint = new[] { WindowTransparencyLevel.Mica };
+                window.TransparencyLevelHint = [WindowTransparencyLevel.Mica];
             }
-            else if (version is OperatingSystem.Windows10)
+            else if (isWindows10OrLater)
             {
                 window.Background = isDark
                     ? SolidColorBrush.Parse("#80202020")
                     : SolidColorBrush.Parse("#DDF3F3F3");
-                window.TransparencyLevelHint = new[] { WindowTransparencyLevel.AcrylicBlur };
+                window.TransparencyLevelHint = [WindowTransparencyLevel.AcrylicBlur];
             }
         }
         else
